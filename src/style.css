@@ -1,8 +1,44 @@
 html,
 body {
-  margin: 0;
   background-color: #333;
   color: white;
+}
+
+body {
+  margin: 2rem;
+}
+
+button {
+  margin-bottom: 2rem;
+  background-color: white;
+  border-radius: 0.25em;
+  border: 0;
+  font-family: 'Nunito Sans';
+  padding: 0.5em 1.5em;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+button:hover {
+  animation: wobble 800ms infinite ease-in-out;
+}
+
+@keyframes wobble {
+  0% {
+    transform: none;
+  }
+
+  25% {
+    transform: rotate(5deg);
+  }
+
+  75% {
+    transform: rotate(-5deg);
+  }
+
+  100% {
+    transform: none;
+  }
 }
 
 .card__big-number {
