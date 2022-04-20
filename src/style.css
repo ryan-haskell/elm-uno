@@ -1,0 +1,17 @@
+html,
+body {
+  margin: 0;
+  background-color: #333;
+}
+
+.card__big-number {
+  font-weight: 900;
+  font-size: 4px;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.card__small-number {
+  font-weight: 900;
+  font-size: 1.25px;
+  font-family: 'Nunito Sans', sans-serif;
+}
