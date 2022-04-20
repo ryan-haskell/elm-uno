@@ -2,6 +2,7 @@ html,
 body {
   margin: 0;
   background-color: #333;
+  color: white;
 }
 
 .card__big-number {

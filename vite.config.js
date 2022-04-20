@@ -7,7 +7,7 @@ export default {
   },
   plugins: [
     Elm.plugin({
-      debug: false
+      debug: true
     })
   ]
 }
