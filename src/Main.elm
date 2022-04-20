@@ -42,6 +42,10 @@ main =
         , viewNumberCard { color = red, value = 2 }
         , viewNumberCard { color = blue, value = 6 }
         , viewNumberCard { color = yellow, value = 4 }
+        , viewDrawTwoCard { color = blue }
+        , viewDrawTwoCard { color = green }
+        , viewDrawTwoCard { color = yellow }
+        , viewDrawTwoCard { color = red }
         , viewReverseCard { color = blue }
         , viewReverseCard { color = green }
         , viewReverseCard { color = yellow }
@@ -165,7 +169,8 @@ viewReverseCard : { color : String } -> Html msg
 viewReverseCard options =
     viewCardWithIcon
         { color = options.color
-        , viewIcon = viewReverseIcon
+        , viewCenterIcon = viewReverseIcon
+        , viewCornerIcon = viewReverseIcon
         }
 
 
@@ -173,7 +178,17 @@ viewSkipCard : { color : String } -> Html msg
 viewSkipCard options =
     viewCardWithIcon
         { color = options.color
-        , viewIcon = viewSkipIcon
+        , viewCenterIcon = viewSkipIcon
+        , viewCornerIcon = viewSkipIcon
+        }
+
+
+viewDrawTwoCard : { color : String } -> Html msg
+viewDrawTwoCard options =
+    viewCardWithIcon
+        { color = options.color
+        , viewCenterIcon = viewTwoCardIcon options.color
+        , viewCornerIcon = viewPlusTwoText
         }
 
 
@@ -181,7 +196,12 @@ viewSkipCard options =
 -- REUSABLE STUFF
 
 
-viewCardWithIcon : { color : String, viewIcon : Svg msg } -> Html msg
+viewCardWithIcon :
+    { color : String
+    , viewCenterIcon : Svg msg
+    , viewCornerIcon : Svg msg
+    }
+    -> Html msg
 viewCardWithIcon options =
     Svg.svg
         [ Svg.Attributes.viewBox "0 0 5.5 9"
@@ -191,15 +211,15 @@ viewCardWithIcon options =
         , viewCardSlantedEllipse
 
         -- big center number shadow
-        , options.viewIcon
+        , options.viewCenterIcon
         , Svg.g
-            [ Svg.Attributes.style "transform-origin: center; transform: translate(-30%, -35%) scale(0.35)"
+            [ Svg.Attributes.style "transform-origin: center; transform: translate(-28%, -35%) scale(0.35)"
             ]
-            [ options.viewIcon ]
+            [ options.viewCornerIcon ]
         , Svg.g
-            [ Svg.Attributes.style "transform-origin: center; transform: translate(30%, 35%) scale(0.35)"
+            [ Svg.Attributes.style "transform-origin: center; transform: translate(28%, 35%) scale(0.35)"
             ]
-            [ options.viewIcon ]
+            [ options.viewCornerIcon ]
         ]
 
 
@@ -304,6 +324,60 @@ viewSkipIcon =
             , Svg.Attributes.strokeWidth "0.5"
             ]
             []
+        ]
+
+
+viewTwoCardIcon : String -> Svg msg
+viewTwoCardIcon color =
+    Svg.g []
+        [ Svg.g [ Svg.Attributes.style "transform-origin: center; transform: rotate(9deg) skewY(-12deg) translate(5%, -5%)" ] [ viewMiniCard color ]
+        , Svg.g [ Svg.Attributes.style "transform-origin: center; transform: rotate(9deg) skewY(-12deg) translate(-5%, 5%)" ] [ viewMiniCard color ]
+        ]
+
+
+viewMiniCard : String -> Svg msg
+viewMiniCard color =
+    Svg.g []
+        [ Svg.rect
+            [ Svg.Attributes.x "35%"
+            , Svg.Attributes.y "38%"
+            , Svg.Attributes.width "25%"
+            , Svg.Attributes.height "26%"
+            , Svg.Attributes.rx "5%"
+            , Svg.Attributes.fill black
+            , Svg.Attributes.stroke black
+            , Svg.Attributes.strokeWidth "2%"
+            ]
+            []
+        , Svg.rect
+            [ Svg.Attributes.x "37.5%"
+            , Svg.Attributes.y "37.5%"
+            , Svg.Attributes.width "25%"
+            , Svg.Attributes.height "25%"
+            , Svg.Attributes.rx "5%"
+            , Svg.Attributes.fill color
+            , Svg.Attributes.stroke white
+            , Svg.Attributes.strokeWidth "2%"
+            ]
+            []
+        ]
+
+
+viewPlusTwoText : Svg msg
+viewPlusTwoText =
+    Svg.g []
+        [ Svg.text_
+            [ Svg.Attributes.class "card__plus-number"
+            , Svg.Attributes.x "50%"
+            , Svg.Attributes.y "50%"
+            , Svg.Attributes.fill white
+            , Svg.Attributes.dominantBaseline "middle"
+            , Svg.Attributes.textAnchor "middle"
+            , Svg.Attributes.stroke black
+            , Svg.Attributes.strokeWidth "0.1"
+            ]
+            [ Svg.text "+2"
+            ]
         ]
 
 

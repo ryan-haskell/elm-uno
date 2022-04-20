@@ -10,6 +10,13 @@ body {
   font-family: 'Nunito Sans', sans-serif;
 }
 
+.card__plus-number {
+  font-weight: 900;
+  font-size: 3px;
+  font-family: 'Nunito Sans', sans-serif;
+  letter-spacing: -0.075em;
+}
+
 .card__small-number {
   font-weight: 900;
   font-size: 1.25px;
