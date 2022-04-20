@@ -42,6 +42,14 @@ main =
         , viewNumberCard { color = red, value = 2 }
         , viewNumberCard { color = blue, value = 6 }
         , viewNumberCard { color = yellow, value = 4 }
+        , viewWildCard
+        , viewWildCard
+        , viewWildCard
+        , viewWildCard
+        , viewWildDraw4Card
+        , viewWildDraw4Card
+        , viewWildDraw4Card
+        , viewWildDraw4Card
         , viewDrawTwoCard { color = blue }
         , viewDrawTwoCard { color = green }
         , viewDrawTwoCard { color = yellow }
@@ -188,7 +196,32 @@ viewDrawTwoCard options =
     viewCardWithIcon
         { color = options.color
         , viewCenterIcon = viewTwoCardIcon options.color
-        , viewCornerIcon = viewPlusTwoText
+        , viewCornerIcon = viewPlusNumberText 2
+        }
+
+
+viewWildCard : Html msg
+viewWildCard =
+    viewCardWithIcon
+        { color = black
+        , viewCenterIcon = viewWildIcon
+        , viewCornerIcon = viewSmallWildIcon
+        }
+
+
+viewWildDraw4Card : Html msg
+viewWildDraw4Card =
+    viewCardWithIcon
+        { color = black
+        , viewCenterIcon =
+            Svg.g []
+                [ viewWildIcon
+                , Svg.g [ Svg.Attributes.style "transform-origin: center; transform: rotate(9deg) skewY(-12deg) translate(0, -8%)" ] [ viewMiniCard green ]
+                , Svg.g [ Svg.Attributes.style "transform-origin: center; transform: rotate(9deg) skewY(-12deg) translate(15%, 0)" ] [ viewMiniCard red ]
+                , Svg.g [ Svg.Attributes.style "transform-origin: center; transform: rotate(9deg) skewY(-12deg) translate(-15%, 0)" ] [ viewMiniCard blue ]
+                , Svg.g [ Svg.Attributes.style "transform-origin: center; transform: rotate(9deg) skewY(-12deg) translate(0, 8%)" ] [ viewMiniCard yellow ]
+                ]
+        , viewCornerIcon = viewPlusNumberText 4
         }
 
 
@@ -335,6 +368,83 @@ viewTwoCardIcon color =
         ]
 
 
+viewSmallWildIcon : Svg msg
+viewSmallWildIcon =
+    Svg.g [ Svg.Attributes.style "transform-origin: center; transform: scale(0.65, 0.6)" ] [ viewWildIcon ]
+
+
+viewWildIcon : Svg msg
+viewWildIcon =
+    Svg.g []
+        [ Svg.mask [ Svg.Attributes.id "myMask" ]
+            [ Svg.ellipse
+                [ Svg.Attributes.fill white
+                , Svg.Attributes.cx "50%"
+                , Svg.Attributes.cy "50%"
+                , Svg.Attributes.width "5"
+                , Svg.Attributes.height "8.5"
+                , Svg.Attributes.rx "30%"
+                , Svg.Attributes.ry "40%"
+                , Svg.Attributes.stroke black
+                , Svg.Attributes.strokeWidth "0.35"
+                , Svg.Attributes.style "transform: skewX(-23deg) translateX(35%); "
+                ]
+                []
+            ]
+        , Svg.ellipse
+            [ Svg.Attributes.fill "none"
+            , Svg.Attributes.cx "50%"
+            , Svg.Attributes.cy "50%"
+            , Svg.Attributes.width "5"
+            , Svg.Attributes.height "8.5"
+            , Svg.Attributes.rx "30%"
+            , Svg.Attributes.ry "40%"
+            , Svg.Attributes.stroke white
+            , Svg.Attributes.strokeWidth "0.35"
+            , Svg.Attributes.style "transform: skewX(-23deg) translateX(35%); "
+            ]
+            []
+        , Svg.g [ Svg.Attributes.mask "url(#myMask)" ]
+            [ Svg.rect
+                [ Svg.Attributes.x "0"
+                , Svg.Attributes.y "0"
+                , Svg.Attributes.width "50%"
+                , Svg.Attributes.height "50%"
+                , Svg.Attributes.fill red
+                , Svg.Attributes.style "transform: skewX(-23deg) translateX(35%); "
+                ]
+                []
+            , Svg.rect
+                [ Svg.Attributes.x "50%"
+                , Svg.Attributes.y "0"
+                , Svg.Attributes.width "50%"
+                , Svg.Attributes.height "50%"
+                , Svg.Attributes.fill yellow
+                , Svg.Attributes.style "transform: skewX(-23deg) translateX(35%); "
+                ]
+                []
+            , Svg.rect
+                [ Svg.Attributes.x "0"
+                , Svg.Attributes.y "50%"
+                , Svg.Attributes.width "50%"
+                , Svg.Attributes.height "50%"
+                , Svg.Attributes.fill green
+                , Svg.Attributes.style "transform: skewX(-23deg) translateX(35%); "
+                ]
+                []
+            , Svg.rect
+                [ Svg.Attributes.x "50%"
+                , Svg.Attributes.y "50%"
+                , Svg.Attributes.width "50%"
+                , Svg.Attributes.height "50%"
+                , Svg.Attributes.fill blue
+                , Svg.Attributes.style "transform: skewX(-23deg) translateX(35%); "
+                ]
+                []
+            ]
+        ]
+
+
 viewMiniCard : String -> Svg msg
 viewMiniCard color =
     Svg.g []
@@ -363,8 +473,8 @@ viewMiniCard color =
         ]
 
 
-viewPlusTwoText : Svg msg
-viewPlusTwoText =
+viewPlusNumberText : Int -> Svg msg
+viewPlusNumberText number =
     Svg.g []
         [ Svg.text_
             [ Svg.Attributes.class "card__plus-number"
@@ -376,7 +486,7 @@ viewPlusTwoText =
             , Svg.Attributes.stroke black
             , Svg.Attributes.strokeWidth "0.1"
             ]
-            [ Svg.text "+2"
+            [ Svg.text ("+" ++ String.fromInt number)
             ]
         ]
 
