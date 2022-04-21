@@ -7,7 +7,7 @@ export default {
   },
   plugins: [
     Elm.plugin({
-      debug: true
+      debug: process.env.NODE_ENV !== 'production'
     })
   ]
 }
