@@ -174,9 +174,23 @@ checkIfGameOver model =
 view : Model -> Html Msg
 view model =
     Html.div [ Html.Attributes.class "game" ]
-        [ viewPlayArea model
+        [ viewGitHubLink
+        , viewPlayArea model
         , viewPlayerHand model
+        , viewYouWonMessage model
         ]
+
+
+viewGitHubLink : Html Msg
+viewGitHubLink =
+    Html.a
+        [ Html.Attributes.class "github-link"
+        , Html.Attributes.target "_blank"
+        , Html.Attributes.rel "noopener noreferrer"
+        , Html.Attributes.href "https://github.com/ryannhg/elm-uno"
+        , Html.Attributes.attribute "aria-label" "View code on GitHub"
+        ]
+        []
 
 
 viewPlayArea : Model -> Html Msg
@@ -184,7 +198,6 @@ viewPlayArea model =
     Html.div [ Html.Attributes.class "play-area" ]
         [ viewPile model
         , viewDeck model
-        , viewYouWonMessage model
         ]
 
 

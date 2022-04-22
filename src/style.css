@@ -4,6 +4,10 @@ body {
   color: white;
 }
 
+body {
+  margin: 0;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -160,4 +164,23 @@ button {
   font-size: 2rem;
   font-weight: bold;
   padding: 0 4rem;
+}
+
+.github-link {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  opacity: 0.5;
+  width: 2rem;
+  height: 2rem;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-image: url('/github.png');
+
+  transition: opacity 300ms ease-in-out;
+}
+
+.github-link:hover {
+  opacity: 1;
 }
