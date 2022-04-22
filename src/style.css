@@ -27,7 +27,6 @@ button {
 }
 
 .button {
-  margin-bottom: 2rem;
   background-color: white;
   border-radius: 0.25em;
   border: 0;
@@ -95,7 +94,21 @@ button {
   padding-top: 15vh;
 }
 
+.declared-color {
+  font-family: 'Nunito Sans', sans-serif;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, 1rem);
+}
+
+.declared-color::before {
+  content: 'Wild color: ';
+  opacity: 0.5;
+}
+
 .play-area {
+  position: relative;
   display: flex;
   gap: 2rem;
 }
@@ -144,9 +157,19 @@ button {
   width: 100%;
 }
 
-
-.dialog {
+.dialog__background {
   position: fixed;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.75);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.dialog__content {
+  position: fixed;
+  z-index: 2;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -154,6 +177,7 @@ button {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
   border-radius: 8px;
   padding: 2rem;
+  padding-bottom: 4rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -163,7 +187,16 @@ button {
   font-family: 'Nunito Sans', sans-serif;
   font-size: 2rem;
   font-weight: bold;
-  padding: 0 4rem;
+  white-space: nowrap;
+  padding: 0 1rem;
+}
+
+.dialog__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  justify-content: center;
 }
 
 .github-link {

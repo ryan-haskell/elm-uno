@@ -28,13 +28,15 @@ type alias Model =
     , deck : Deck
     , pile : List Card
     , hand : List Card
-    , counter : Int
+    , declaredColor : Maybe Card.Color
+    , seed : Int
     }
 
 
 type Phase
     = ReadyToPlay
     | PlayingGame
+    | DeclaringWildCardColor
     | PlayerWonTheGame
 
 
@@ -44,7 +46,8 @@ init =
     , deck = Deck.new (Random.initialSeed 0)
     , pile = []
     , hand = []
-    , counter = 1
+    , declaredColor = Nothing
+    , seed = 3
     }
 
 
@@ -56,6 +59,7 @@ type Msg
     = PlayerClickedDeck
     | PlayerClickedCardInHand Card
     | PlayerClickedPlayAgain
+    | PlayerDeclaredColor Card.Color
 
 
 update : Msg -> Model -> Model
@@ -67,10 +71,13 @@ update msg model =
                     startNewGame model
 
                 PlayingGame ->
-                    drawAnotherCard model
+                    drawAnotherCardIntoHand model
+
+                DeclaringWildCardColor ->
+                    model
 
                 PlayerWonTheGame ->
-                    startNewGame model
+                    model
 
         PlayerClickedCardInHand card ->
             case List.head model.pile of
@@ -78,12 +85,25 @@ update msg model =
                     model
 
                 Just topCardOnPile ->
-                    if Card.isOkayToPlay { topCardOnPile = topCardOnPile, cardFromHand = card } then
+                    if
+                        Card.isOkayToPlay
+                            { declaredColor = model.declaredColor
+                            , topCardOnPile = topCardOnPile
+                            , cardFromHand = card
+                            }
+                    then
                         playCardOntoPile card model
                             |> checkIfGameOver
+                            |> checkIfPlayedWildCard card
 
                     else
                         model
+
+        PlayerDeclaredColor color ->
+            { model
+                | declaredColor = Just color
+                , phase = PlayingGame
+            }
 
         PlayerClickedPlayAgain ->
             startNewGame model
@@ -94,37 +114,94 @@ startNewGame model =
     let
         newDeck : Deck
         newDeck =
-            Deck.new (Random.initialSeed model.counter)
+            Deck.new (Random.initialSeed model.seed)
 
-        updated1 : { cards : List Card, deck : Deck }
-        updated1 =
+        afterDraw7 : { cards : List Card, deck : Deck }
+        afterDraw7 =
             Deck.draw 7 newDeck
 
-        updated2 : { cards : List Card, deck : Deck }
-        updated2 =
-            Deck.draw 1 updated1.deck
+        afterDraw8 : { cards : List Card, deck : Deck }
+        afterDraw8 =
+            Deck.draw 1 afterDraw7.deck
 
         maybeCardToAddToPile : Maybe Card
         maybeCardToAddToPile =
-            List.head updated2.cards
-    in
-    { model
-        | phase = PlayingGame
-        , counter = model.counter + 1
-        , deck = updated2.deck
-        , hand = updated1.cards
-        , pile =
+            List.head afterDraw8.cards
+
+        shouldDrawAnotherCard : Bool
+        shouldDrawAnotherCard =
             case maybeCardToAddToPile of
                 Just card ->
-                    [ card ] ++ model.pile
+                    Card.isWild card
 
                 Nothing ->
-                    model.pile
-    }
+                    False
+
+        updatedModel : Model
+        updatedModel =
+            { model
+                | phase = PlayingGame
+                , seed = model.seed + 1
+                , deck = afterDraw8.deck
+                , hand = afterDraw7.cards
+                , pile =
+                    case maybeCardToAddToPile of
+                        Just card ->
+                            [ card ]
+
+                        Nothing ->
+                            []
+            }
+    in
+    if shouldDrawAnotherCard then
+        drawAnotherCardOntoPile updatedModel
+
+    else
+        updatedModel
 
 
-drawAnotherCard : Model -> Model
-drawAnotherCard model =
+drawAnotherCardOntoPile : Model -> Model
+drawAnotherCardOntoPile model =
+    let
+        updated : { cards : List Card, deck : Deck }
+        updated =
+            Deck.draw 1 model.deck
+
+        maybeCard : Maybe Card
+        maybeCard =
+            List.head updated.cards
+
+        shouldDrawAnotherCard : Bool
+        shouldDrawAnotherCard =
+            case maybeCard of
+                Just card ->
+                    Card.isWild card
+
+                Nothing ->
+                    False
+
+        updatedModel : Model
+        updatedModel =
+            { model
+                | deck = updated.deck
+                , pile =
+                    case maybeCard of
+                        Just card ->
+                            card :: model.pile
+
+                        Nothing ->
+                            model.pile
+            }
+    in
+    if shouldDrawAnotherCard then
+        drawAnotherCardOntoPile updatedModel
+
+    else
+        updatedModel
+
+
+drawAnotherCardIntoHand : Model -> Model
+drawAnotherCardIntoHand model =
     let
         updated : { cards : List Card, deck : Deck }
         updated =
@@ -168,6 +245,20 @@ checkIfGameOver model =
         model
 
 
+checkIfPlayedWildCard : Card -> Model -> Model
+checkIfPlayedWildCard card model =
+    case model.phase of
+        PlayingGame ->
+            if Card.isWild card then
+                { model | phase = DeclaringWildCardColor }
+
+            else
+                { model | declaredColor = Nothing }
+
+        _ ->
+            model
+
+
 
 -- VIEW
 
@@ -178,7 +269,7 @@ view model =
         [ viewGitHubLink
         , viewPlayArea model
         , viewPlayerHand model
-        , viewYouWonMessage model
+        , viewDialog model
         ]
 
 
@@ -199,7 +290,18 @@ viewPlayArea model =
     Html.div [ Html.Attributes.class "play-area" ]
         [ viewPile model
         , viewDeck model
+        , viewDeclaredColor model
         ]
+
+
+viewDeclaredColor : Model -> Html Msg
+viewDeclaredColor model =
+    case model.declaredColor of
+        Just color ->
+            Html.div [ Html.Attributes.class "declared-color" ] [ Html.text (Card.colorToName color) ]
+
+        Nothing ->
+            Html.text ""
 
 
 viewPile : Model -> Html Msg
@@ -250,18 +352,57 @@ viewCardInHand card =
         [ Card.view card ]
 
 
-viewYouWonMessage : Model -> Html Msg
-viewYouWonMessage model =
+viewDialog : Model -> Html Msg
+viewDialog model =
     case model.phase of
+        DeclaringWildCardColor ->
+            viewDeclareColorDialog model
+
         PlayerWonTheGame ->
-            Html.div [ Html.Attributes.class "dialog" ]
-                [ Html.p [ Html.Attributes.class "dialog__message" ] [ Html.text "You won!!" ]
-                , Html.button
-                    [ Html.Events.onClick PlayerClickedPlayAgain
-                    , Html.Attributes.class "button"
-                    ]
-                    [ Html.text "Play again!" ]
-                ]
+            viewYouWonDialog model
 
         _ ->
             Html.text ""
+
+
+viewDeclareColorDialog : Model -> Html Msg
+viewDeclareColorDialog model =
+    let
+        viewChooseColorButton color =
+            Html.button
+                [ Html.Events.onClick (PlayerDeclaredColor color)
+                , Html.Attributes.class "button"
+                ]
+                [ Html.text (Card.colorToName color) ]
+    in
+    viewDialogWithContent
+        [ Html.p [ Html.Attributes.class "dialog__message" ] [ Html.text "Pick a color:" ]
+        , Html.div [ Html.Attributes.class "dialog__buttons" ]
+            (List.map viewChooseColorButton
+                [ Card.Red
+                , Card.Yellow
+                , Card.Blue
+                , Card.Green
+                ]
+            )
+        ]
+
+
+viewYouWonDialog : Model -> Html Msg
+viewYouWonDialog model =
+    viewDialogWithContent
+        [ Html.p [ Html.Attributes.class "dialog__message" ] [ Html.text "You won!!" ]
+        , Html.button
+            [ Html.Events.onClick PlayerClickedPlayAgain
+            , Html.Attributes.class "button"
+            ]
+            [ Html.text "Play again!" ]
+        ]
+
+
+viewDialogWithContent : List (Html msg) -> Html msg
+viewDialogWithContent content =
+    Html.div [ Html.Attributes.class "dialog" ]
+        [ Html.div [ Html.Attributes.class "dialog__background" ] []
+        , Html.div [ Html.Attributes.class "dialog__content" ] content
+        ]

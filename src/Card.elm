@@ -1,7 +1,9 @@
 module Card exposing
     ( Card
-    , Color
+    , Color(..)
+    , colorToName
     , isOkayToPlay
+    , isWild
     , shuffle
     , toUniqueId
     , unshuffledDeck
@@ -42,12 +44,12 @@ type CardKind
     | WildDraw4Card
 
 
-isOkayToPlay : { topCardOnPile : Card, cardFromHand : Card } -> Bool
-isOkayToPlay cards =
+isOkayToPlay : { declaredColor : Maybe Color, topCardOnPile : Card, cardFromHand : Card } -> Bool
+isOkayToPlay options =
     let
         { topCardOnPile, cardFromHand } =
-            { topCardOnPile = toBasicInformation cards.topCardOnPile
-            , cardFromHand = toBasicInformation cards.cardFromHand
+            { topCardOnPile = toBasicInformation options.topCardOnPile
+            , cardFromHand = toBasicInformation options.cardFromHand
             }
 
         haveSameValue : Bool
@@ -74,8 +76,12 @@ isOkayToPlay cards =
 
         cardFromHandMatchesDeclaredColor : Bool
         cardFromHandMatchesDeclaredColor =
-            -- TODO: Pass in declared color when that feature is added in!
-            topCardOnPile.isWild
+            case ( options.declaredColor, cardFromHand.color ) of
+                ( Just color1, Just color2 ) ->
+                    color1 == color2
+
+                _ ->
+                    False
     in
     List.any (\condition -> condition == True)
         [ haveSameValue
@@ -83,6 +89,12 @@ isOkayToPlay cards =
         , cardFromHandIsWild
         , cardFromHandMatchesDeclaredColor
         ]
+
+
+isWild : Card -> Bool
+isWild card =
+    toBasicInformation card
+        |> .isWild
 
 
 type Value
@@ -275,6 +287,22 @@ type Color
     | Green
     | Yellow
     | Blue
+
+
+colorToName : Color -> String
+colorToName color =
+    case color of
+        Red ->
+            "Red"
+
+        Yellow ->
+            "Yellow"
+
+        Green ->
+            "Green"
+
+        Blue ->
+            "Blue"
 
 
 toHexColor : Color -> String
