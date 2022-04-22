@@ -1,4 +1,14 @@
-module Card exposing (Card, Color, shuffle, unshuffledDeck, view, viewBackOfCard)
+module Card exposing
+    ( Card
+    , Color
+    , isOkayToPlay
+    , shuffle
+    , unshuffledDeck
+    , view
+    , viewBackOfCard
+    , viewEmptyDeck
+    , viewEmptyPile
+    )
 
 import Html exposing (Html)
 import Random
@@ -14,6 +24,102 @@ type Card
     | DrawTwoCard { color : Color }
     | WildCard
     | WildDraw4Card
+
+
+isOkayToPlay : { topCardOnPile : Card, cardFromHand : Card } -> Bool
+isOkayToPlay cards =
+    let
+        { topCardOnPile, cardFromHand } =
+            { topCardOnPile = toBasicInformation cards.topCardOnPile
+            , cardFromHand = toBasicInformation cards.cardFromHand
+            }
+
+        haveSameValue : Bool
+        haveSameValue =
+            case ( topCardOnPile.value, cardFromHand.value ) of
+                ( Just value1, Just value2 ) ->
+                    value1 == value2
+
+                _ ->
+                    False
+
+        haveSameColor : Bool
+        haveSameColor =
+            case ( topCardOnPile.color, cardFromHand.color ) of
+                ( Just color1, Just color2 ) ->
+                    color1 == color2
+
+                _ ->
+                    False
+
+        cardFromHandIsWild : Bool
+        cardFromHandIsWild =
+            cardFromHand.isWild
+
+        cardFromHandMatchesDeclaredColor : Bool
+        cardFromHandMatchesDeclaredColor =
+            -- TODO: Pass in declared color when that feature is added in!
+            topCardOnPile.isWild
+    in
+    List.any (\condition -> condition == True)
+        [ haveSameValue
+        , haveSameColor
+        , cardFromHandIsWild
+        , cardFromHandMatchesDeclaredColor
+        ]
+
+
+type Value
+    = NumberValue Int
+    | SkipValue
+    | ReverseValue
+    | DrawTwoValue
+
+
+toBasicInformation :
+    Card
+    ->
+        { value : Maybe Value
+        , color : Maybe Color
+        , isWild : Bool
+        }
+toBasicInformation card =
+    case card of
+        NumberCard { value, color } ->
+            { value = Just (NumberValue value)
+            , color = Just color
+            , isWild = False
+            }
+
+        SkipCard { color } ->
+            { value = Just SkipValue
+            , color = Just color
+            , isWild = False
+            }
+
+        ReverseCard { color } ->
+            { value = Just ReverseValue
+            , color = Just color
+            , isWild = False
+            }
+
+        DrawTwoCard { color } ->
+            { value = Just DrawTwoValue
+            , color = Just color
+            , isWild = False
+            }
+
+        WildCard ->
+            { value = Nothing
+            , color = Nothing
+            , isWild = True
+            }
+
+        WildDraw4Card ->
+            { value = Nothing
+            , color = Nothing
+            , isWild = True
+            }
 
 
 view : Card -> Html msg
@@ -54,6 +160,48 @@ viewBackOfCard =
         , viewCenterIcon = viewUnoCardBack
         , viewCornerIcon = Svg.g [] []
         }
+
+
+viewEmptyPile : Html msg
+viewEmptyPile =
+    viewEmptyStackWithLabel "Pile"
+
+
+viewEmptyDeck : Html msg
+viewEmptyDeck =
+    viewEmptyStackWithLabel "Deck"
+
+
+viewEmptyStackWithLabel : String -> Html msg
+viewEmptyStackWithLabel label =
+    Svg.svg
+        [ Svg.Attributes.class "card"
+        , Svg.Attributes.viewBox "0 0 5.5 9"
+        , Svg.Attributes.width "200px"
+        ]
+        [ Svg.rect
+            [ Svg.Attributes.fill "none"
+            , Svg.Attributes.x "0.25"
+            , Svg.Attributes.y "0.25"
+            , Svg.Attributes.width "5"
+            , Svg.Attributes.height "8.5"
+            , Svg.Attributes.rx "0.25"
+            , Svg.Attributes.stroke white
+            , Svg.Attributes.strokeDasharray "0.5"
+            , Svg.Attributes.strokeWidth "0.25"
+            ]
+            []
+        , Svg.text_
+            [ Svg.Attributes.class "card__empty-label"
+            , Svg.Attributes.x "50%"
+            , Svg.Attributes.y "50%"
+            , Svg.Attributes.fill white
+            , Svg.Attributes.dominantBaseline "middle"
+            , Svg.Attributes.textAnchor "middle"
+            ]
+            [ Svg.text label
+            ]
+        ]
 
 
 nameOfTheGame : String
@@ -191,7 +339,8 @@ viewNumberCard options =
                 "text-decoration: none"
     in
     Svg.svg
-        [ Svg.Attributes.viewBox "0 0 5.5 9"
+        [ Svg.Attributes.class "card"
+        , Svg.Attributes.viewBox "0 0 5.5 9"
         , Svg.Attributes.width "200px"
         ]
         [ viewCardRectangleWithBackground options.color
@@ -347,7 +496,8 @@ viewCardWithIcon :
     -> Html msg
 viewCardWithIcon options =
     Svg.svg
-        [ Svg.Attributes.viewBox "0 0 5.5 9"
+        [ Svg.Attributes.class "card"
+        , Svg.Attributes.viewBox "0 0 5.5 9"
         , Svg.Attributes.width "200px"
         ]
         [ viewCardRectangleWithBackground options.color

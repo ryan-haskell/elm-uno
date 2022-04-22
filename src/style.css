@@ -4,11 +4,25 @@ body {
   color: white;
 }
 
-body {
-  margin: 2rem;
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+div[data-elm-hot] {
+  height: 100%;
 }
 
 button {
+  font: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.button {
   margin-bottom: 2rem;
   background-color: white;
   border-radius: 0.25em;
@@ -19,7 +33,7 @@ button {
   cursor: pointer;
 }
 
-button:hover {
+.button:hover {
   animation: wobble 800ms infinite ease-in-out;
 }
 
@@ -58,4 +72,92 @@ button:hover {
   font-weight: 900;
   font-size: 1.25px;
   font-family: 'Nunito Sans', sans-serif;
+}
+
+.card__empty-label {
+  font-weight: 900;
+  font-size: 1.2px;
+  opacity: 0.5;
+  text-transform: uppercase;
+  font-family: 'Nunito Sans', sans-serif;
+}
+
+.game {
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 2rem;
+  padding-top: 15vh;
+}
+
+.play-area {
+  display: flex;
+  gap: 2rem;
+}
+
+.card {
+  max-width: 100%;
+}
+
+.deck {}
+
+.pile {}
+
+.hand {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  padding: 2rem;
+
+  display: flex;
+  max-width: 800px;
+
+  transition: transform 300ms ease-in;
+  transform: translateY(50vh);
+}
+
+.hand--has-cards {
+  transform: none;
+}
+
+.hand .hand__card-button:not(:first-child) {
+  position: relative;
+  z-index: 1;
+  margin-left: -3rem;
+}
+
+.hand .hand__card-button {
+  transition: transform 300ms ease-in-out;
+}
+
+.hand .hand__card-button:hover {
+  z-index: 2;
+  transform: translateY(-20%);
+}
+
+.hand .card {
+  width: 100%;
+}
+
+
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #222;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dialog__message {
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 2rem;
+  font-weight: bold;
+  padding: 0 4rem;
 }
