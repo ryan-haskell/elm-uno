@@ -56,6 +56,7 @@ viewBackOfCard =
         }
 
 
+nameOfTheGame : String
 nameOfTheGame =
     "NO U!"
 
