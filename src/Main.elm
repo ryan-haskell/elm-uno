@@ -63,6 +63,7 @@ view model =
         [ Html.button
             [ Html.Events.onClick UserClickedShuffle ]
             [ Html.text "Shuffle!" ]
+        , Card.viewBackOfCard
         , model.deck
             |> List.map Card.view
             |> Html.div []

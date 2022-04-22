@@ -1,4 +1,4 @@
-module Card exposing (Card, Color, shuffle, unshuffledDeck, view)
+module Card exposing (Card, Color, shuffle, unshuffledDeck, view, viewBackOfCard)
 
 import Html exposing (Html)
 import Random
@@ -45,6 +45,64 @@ view card =
 
         WildDraw4Card ->
             viewWildDraw4Card
+
+
+viewBackOfCard : Html msg
+viewBackOfCard =
+    viewCardWithIcon
+        { color = black
+        , viewCenterIcon = viewUnoCardBack
+        , viewCornerIcon = Svg.g [] []
+        }
+
+
+nameOfTheGame =
+    "NO U!"
+
+
+viewUnoCardBack : Svg msg
+viewUnoCardBack =
+    Svg.g []
+        [ Svg.ellipse
+            [ Svg.Attributes.fill red
+            , Svg.Attributes.cx "50%"
+            , Svg.Attributes.cy "50%"
+            , Svg.Attributes.width "5"
+            , Svg.Attributes.height "8.5"
+            , Svg.Attributes.rx "30%"
+            , Svg.Attributes.ry "40%"
+            , Svg.Attributes.stroke red
+            , Svg.Attributes.strokeWidth "0.35"
+            , Svg.Attributes.style "transform: skewX(-23deg) translateX(35%); "
+            ]
+            []
+        , Svg.g [ Svg.Attributes.style "transform-origin: center; transform: scale(0.37) rotate(-10deg); " ]
+            [ Svg.text_
+                [ Svg.Attributes.class "card__big-number"
+                , Svg.Attributes.x "50%"
+                , Svg.Attributes.y "55%"
+                , Svg.Attributes.fill black
+                , Svg.Attributes.dominantBaseline "middle"
+                , Svg.Attributes.textAnchor "middle"
+                ]
+                [ Svg.text nameOfTheGame
+                ]
+
+            -- big center number
+            , Svg.text_
+                [ Svg.Attributes.class "card__big-number"
+                , Svg.Attributes.x "53%"
+                , Svg.Attributes.y "53%"
+                , Svg.Attributes.fill yellow
+                , Svg.Attributes.dominantBaseline "middle"
+                , Svg.Attributes.textAnchor "middle"
+                , Svg.Attributes.stroke black
+                , Svg.Attributes.strokeWidth "0.1"
+                ]
+                [ Svg.text nameOfTheGame
+                ]
+            ]
+        ]
 
 
 type Color
