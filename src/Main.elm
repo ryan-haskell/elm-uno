@@ -398,8 +398,8 @@ viewDeclareColorDialog model =
             (List.map viewChooseColorButton
                 [ Card.Red
                 , Card.Yellow
-                , Card.Blue
                 , Card.Green
+                , Card.Blue
                 ]
             )
         ]
@@ -408,7 +408,7 @@ viewDeclareColorDialog model =
 viewYouWonDialog : Model -> Html Msg
 viewYouWonDialog model =
     viewDialogWithContent
-        [ Html.p [ Html.Attributes.class "dialog__message" ] [ Html.text "You won!!" ]
+        [ Html.p [ Html.Attributes.class "dialog__message" ] [ Html.text "You won!" ]
         , Html.button
             [ Html.Events.onClick PlayerClickedPlayAgain
             , Html.Attributes.class "button"
