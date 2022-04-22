@@ -10,12 +10,18 @@ import Html.Keyed
 import Random
 
 
-main : Program () Model Msg
+type alias Flags =
+    { seed : Int
+    }
+
+
+main : Program Flags Model Msg
 main =
-    Browser.sandbox
+    Browser.element
         { init = init
         , update = update
         , view = view
+        , subscriptions = subscriptions
         }
 
 
@@ -40,15 +46,17 @@ type Phase
     | PlayerWonTheGame
 
 
-init : Model
-init =
-    { phase = ReadyToPlay
-    , deck = Deck.new (Random.initialSeed 0)
-    , pile = []
-    , hand = []
-    , declaredColor = Nothing
-    , seed = 3
-    }
+init : Flags -> ( Model, Cmd Msg )
+init flags =
+    ( { phase = ReadyToPlay
+      , deck = Deck.new (Random.initialSeed 0)
+      , pile = []
+      , hand = []
+      , declaredColor = Nothing
+      , seed = flags.seed
+      }
+    , Cmd.none
+    )
 
 
 
@@ -62,27 +70,27 @@ type Msg
     | PlayerDeclaredColor Card.Color
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         PlayerClickedDeck ->
             case model.phase of
                 ReadyToPlay ->
-                    startNewGame model
+                    ( startNewGame model, Cmd.none )
 
                 PlayingGame ->
-                    drawAnotherCardIntoHand model
+                    ( drawAnotherCardIntoHand model, Cmd.none )
 
                 DeclaringWildCardColor ->
-                    model
+                    ( model, Cmd.none )
 
                 PlayerWonTheGame ->
-                    model
+                    ( model, Cmd.none )
 
         PlayerClickedCardInHand card ->
             case List.head model.pile of
                 Nothing ->
-                    model
+                    ( model, Cmd.none )
 
                 Just topCardOnPile ->
                     if
@@ -92,21 +100,30 @@ update msg model =
                             , cardFromHand = card
                             }
                     then
-                        playCardOntoPile card model
+                        ( playCardOntoPile card model
                             |> checkIfGameOver
                             |> checkIfPlayedWildCard card
+                        , Cmd.none
+                        )
 
                     else
-                        model
+                        ( model, Cmd.none )
 
         PlayerDeclaredColor color ->
-            { model
+            ( { model
                 | declaredColor = Just color
                 , phase = PlayingGame
-            }
+              }
+            , Cmd.none
+            )
 
         PlayerClickedPlayAgain ->
-            startNewGame model
+            ( startNewGame model, Cmd.none )
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none
 
 
 startNewGame : Model -> Model
@@ -256,7 +273,7 @@ checkIfPlayedWildCard card model =
                 { model | declaredColor = Nothing }
 
         _ ->
-            model
+            { model | declaredColor = Nothing }
 
 
 
