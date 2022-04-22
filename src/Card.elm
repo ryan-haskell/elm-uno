@@ -3,6 +3,7 @@ module Card exposing
     , Color
     , isOkayToPlay
     , shuffle
+    , toUniqueId
     , unshuffledDeck
     , view
     , viewBackOfCard
@@ -18,6 +19,21 @@ import Svg.Attributes
 
 
 type Card
+    = Card Internals
+
+
+type alias Internals =
+    { id : String
+    , kind : CardKind
+    }
+
+
+toUniqueId : Card -> String
+toUniqueId (Card card) =
+    card.id
+
+
+type CardKind
     = NumberCard { value : Int, color : Color }
     | ReverseCard { color : Color }
     | SkipCard { color : Color }
@@ -83,8 +99,8 @@ toBasicInformation :
         , color : Maybe Color
         , isWild : Bool
         }
-toBasicInformation card =
-    case card of
+toBasicInformation (Card card) =
+    case card.kind of
         NumberCard { value, color } ->
             { value = Just (NumberValue value)
             , color = Just color
@@ -123,8 +139,8 @@ toBasicInformation card =
 
 
 view : Card -> Html msg
-view card =
-    case card of
+view (Card card) =
+    case card.kind of
         NumberCard { value, color } ->
             viewNumberCard
                 { value = value
@@ -284,16 +300,27 @@ allColors =
 
 unshuffledDeck : List Card
 unshuffledDeck =
-    List.concat
-        [ -- NUMBER CARDS
-          allColors
-            |> List.concatMap createNumberCards
-        , allColors |> List.map (toColorCard SkipCard)
-        , allColors |> List.map (toColorCard ReverseCard)
-        , allColors |> List.map (toColorCard DrawTwoCard)
-        , List.repeat 4 WildCard
-        , List.repeat 4 WildDraw4Card
-        ]
+    let
+        cardKinds : List CardKind
+        cardKinds =
+            List.concat
+                [ allColors
+                    |> List.concatMap createNumberCards
+                , allColors |> List.map (toColorCard SkipCard)
+                , allColors |> List.map (toColorCard ReverseCard)
+                , allColors |> List.map (toColorCard DrawTwoCard)
+                , List.repeat 4 WildCard
+                , List.repeat 4 WildDraw4Card
+                ]
+    in
+    cardKinds
+        |> List.indexedMap
+            (\index kind ->
+                Card
+                    { id = String.fromInt index
+                    , kind = kind
+                    }
+            )
 
 
 shuffle : Random.Seed -> List Card -> List Card
@@ -305,7 +332,7 @@ shuffle seed deck =
     shuffledDeck
 
 
-createNumberCards : Color -> List Card
+createNumberCards : Color -> List CardKind
 createNumberCards color =
     List.range 0 9
         |> List.map
@@ -314,7 +341,7 @@ createNumberCards color =
             )
 
 
-toColorCard : ({ color : Color } -> Card) -> Color -> Card
+toColorCard : ({ color : Color } -> CardKind) -> Color -> CardKind
 toColorCard toCard color =
     toCard { color = color }
 

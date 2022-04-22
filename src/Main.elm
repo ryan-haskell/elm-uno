@@ -6,6 +6,7 @@ import Deck exposing (Deck)
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
+import Html.Keyed
 import Random
 
 
@@ -53,7 +54,7 @@ init =
 
 type Msg
     = PlayerClickedDeck
-    | PlayerClickedCardInHand Int Card
+    | PlayerClickedCardInHand Card
     | PlayerClickedPlayAgain
 
 
@@ -71,14 +72,14 @@ update msg model =
                 PlayerWonTheGame ->
                     startNewGame model
 
-        PlayerClickedCardInHand index card ->
+        PlayerClickedCardInHand card ->
             case List.head model.pile of
                 Nothing ->
                     model
 
                 Just topCardOnPile ->
                     if Card.isOkayToPlay { topCardOnPile = topCardOnPile, cardFromHand = card } then
-                        playCardOntoPile index card model
+                        playCardOntoPile card model
                             |> checkIfGameOver
 
                     else
@@ -145,15 +146,15 @@ drawAnotherCard model =
     }
 
 
-playCardOntoPile : Int -> Card -> Model -> Model
-playCardOntoPile index card model =
+playCardOntoPile : Card -> Model -> Model
+playCardOntoPile card model =
     let
-        removeAtIndex : Int -> List a -> List a
-        removeAtIndex i list =
-            List.take i list ++ List.drop (i + 1) list
+        doesNotHaveMatchingId : Card -> Bool
+        doesNotHaveMatchingId cardInHand =
+            Card.toUniqueId card /= Card.toUniqueId cardInHand
     in
     { model
-        | hand = removeAtIndex index model.hand
+        | hand = List.filter doesNotHaveMatchingId model.hand
         , pile = card :: model.pile
     }
 
@@ -224,20 +225,27 @@ viewDeck model =
 
 viewPlayerHand : Model -> Html Msg
 viewPlayerHand model =
-    Html.div
+    let
+        toKeyedNodeTuple : Card -> ( String, Html Msg )
+        toKeyedNodeTuple card =
+            ( Card.toUniqueId card
+            , viewCardInHand card
+            )
+    in
+    Html.Keyed.node "div"
         [ Html.Attributes.class "hand"
         , Html.Attributes.classList
             [ ( "hand--has-cards", not (List.isEmpty model.hand) )
             ]
         ]
-        (List.indexedMap viewCardInHand model.hand)
+        (List.map toKeyedNodeTuple model.hand)
 
 
-viewCardInHand : Int -> Card -> Html Msg
-viewCardInHand index card =
+viewCardInHand : Card -> Html Msg
+viewCardInHand card =
     Html.button
         [ Html.Attributes.class "hand__card-button"
-        , Html.Events.onClick (PlayerClickedCardInHand index card)
+        , Html.Events.onClick (PlayerClickedCardInHand card)
         ]
         [ Card.view card ]
 
