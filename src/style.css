@@ -139,35 +139,38 @@ button {
 }
 
 .hand--left {
+  pointer-events: none;
   position: fixed;
-  left: -50%;
+  right: 50%;
   bottom: unset;
-  top: 40%;
+  top: 0;
   transform-origin: center;
   padding: 0;
-  transform: scale(0.5) translateY(-50%) rotate(90deg);
+  transform: scale(0.5) rotate(90deg) translate(80%, 0%);
 }
 
 
 .hand--right {
+  pointer-events: none;
   position: fixed;
-  right: -50%;
+  left: 50%;
   bottom: unset;
-  top: 40%;
+  top: 0;
   transform-origin: center;
   padding: 0;
-  transform: scale(0.5) translateY(-50%) rotate(-90deg);
+  transform: scale(0.5) rotate(-90deg) translate(-80%, 0%);
 }
 
 
 .hand--top {
+  pointer-events: none;
   position: fixed;
-  right: 0;
+  right: 50%;
   bottom: unset;
-  top: 0%;
+  top: 0;
   transform-origin: center;
   padding: 0;
-  transform: scale(0.5) translateY(-100%) rotate(180deg);
+  transform: scale(.5) translate(100%, -100%) rotate(180deg);
 }
 
 .hand .hand__card-button:not(:first-child) {
