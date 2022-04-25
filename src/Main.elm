@@ -79,7 +79,10 @@ update msg model =
                     ( startNewGame model, Cmd.none )
 
                 PlayingGame ->
-                    ( drawAnotherCardIntoHand model, Cmd.none )
+                    ( drawAnotherCardIntoHand model
+                        |> checkIfDeckIsEmpty
+                    , Cmd.none
+                    )
 
                 DeclaringWildCardColor ->
                     ( model, Cmd.none )
@@ -103,6 +106,7 @@ update msg model =
                         ( playCardOntoPile card model
                             |> checkIfGameOver
                             |> checkIfPlayedWildCard card
+                            |> checkIfDeckIsEmpty
                         , Cmd.none
                         )
 
@@ -274,6 +278,26 @@ checkIfPlayedWildCard card model =
 
         _ ->
             { model | declaredColor = Nothing }
+
+
+checkIfDeckIsEmpty : Model -> Model
+checkIfDeckIsEmpty model =
+    if Deck.isEmpty model.deck then
+        let
+            newDeck : Deck
+            newDeck =
+                Deck.reshuffle
+                    (Random.initialSeed model.seed)
+                    (List.drop 1 model.pile)
+        in
+        { model
+            | deck = newDeck
+            , seed = model.seed + 1
+            , pile = List.take 1 model.pile
+        }
+
+    else
+        model
 
 
 
