@@ -683,6 +683,7 @@ viewComputerHands model =
                     viewHandOnSide
                         { side = side
                         , hand = hand
+                        , isCurrentlyPlaying = id == model.currentPlayerId
                         }
 
                 Nothing ->
@@ -700,6 +701,7 @@ viewPlayerHand model =
     viewHandOnSide
         { side = Bottom
         , hand = model.playersHand
+        , isCurrentlyPlaying = 0 == model.currentPlayerId
         }
 
 
@@ -710,7 +712,7 @@ type Side
     | Bottom
 
 
-viewHandOnSide : { side : Side, hand : List Card } -> Html Msg
+viewHandOnSide : { side : Side, hand : List Card, isCurrentlyPlaying : Bool } -> Html Msg
 viewHandOnSide options =
     let
         toKeyedNodeTuple : Card -> ( String, Html Msg )
@@ -723,6 +725,7 @@ viewHandOnSide options =
         [ Html.Attributes.class "hand"
         , Html.Attributes.classList
             [ ( "hand--has-cards", not (List.isEmpty options.hand) )
+            , ( "hand--active", options.isCurrentlyPlaying )
             , ( "hand--top", options.side == Top )
             , ( "hand--left", options.side == Left )
             , ( "hand--right", options.side == Right )
