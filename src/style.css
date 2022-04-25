@@ -97,9 +97,9 @@ button {
 .declared-color {
   font-family: 'Nunito Sans', sans-serif;
   position: absolute;
-  top: 100%;
+  bottom: 100%;
   left: 50%;
-  transform: translate(-50%, 1rem);
+  transform: translate(-50%, -1rem);
 }
 
 .declared-color::before {
