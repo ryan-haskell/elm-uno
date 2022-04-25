@@ -136,8 +136,22 @@ button {
 }
 
 .hand--active {
-  outline: solid 0.5rem white;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.35);
+  animation: glow 2000ms ease-in-out infinite;
+}
+
+@keyframes glow {
+  0% {
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  50% {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  100% {
+    background: rgba(255, 255, 255, 0.35);
+  }
 }
 
 .hand--has-cards {
