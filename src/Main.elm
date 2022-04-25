@@ -3,11 +3,14 @@ module Main exposing (main)
 import Browser
 import Card exposing (Card)
 import Deck exposing (Deck)
+import Dict exposing (Dict)
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html.Keyed
 import Random
+import Random.List
+import Time
 
 
 type alias Flags =
@@ -33,17 +36,39 @@ type alias Model =
     { phase : Phase
     , deck : Deck
     , pile : List Card
-    , hand : List Card
+    , direction : Direction
+    , currentPlayerId : Int
+    , playersHand : List Card
+    , computerHands : Dict PlayerId (List Card)
     , declaredColor : Maybe Card.Color
     , seed : Int
     }
+
+
+type Direction
+    = Clockwise
+    | CounterClockwise
+
+
+reverseDirection : Direction -> Direction
+reverseDirection direction =
+    case direction of
+        Clockwise ->
+            CounterClockwise
+
+        CounterClockwise ->
+            Clockwise
+
+
+type alias PlayerId =
+    Int
 
 
 type Phase
     = ReadyToPlay
     | PlayingGame
     | DeclaringWildCardColor
-    | PlayerWonTheGame
+    | PlayerWonTheGame Int
 
 
 init : Flags -> ( Model, Cmd Msg )
@@ -51,7 +76,15 @@ init flags =
     ( { phase = ReadyToPlay
       , deck = Deck.new (Random.initialSeed 0)
       , pile = []
-      , hand = []
+      , currentPlayerId = 0
+      , direction = Clockwise
+      , playersHand = []
+      , computerHands =
+            Dict.fromList
+                [ ( 1, [] )
+                , ( 2, [] )
+                , ( 3, [] )
+                ]
       , declaredColor = Nothing
       , seed = flags.seed
       }
@@ -68,6 +101,7 @@ type Msg
     | PlayerClickedCardInHand Card
     | PlayerClickedPlayAgain
     | PlayerDeclaredColor Card.Color
+    | ComputerTakesTurn
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -79,15 +113,20 @@ update msg model =
                     ( startNewGame model, Cmd.none )
 
                 PlayingGame ->
-                    ( drawAnotherCardIntoHand model
-                        |> checkIfDeckIsEmpty
-                    , Cmd.none
-                    )
+                    if isHumanPlayersTurn model then
+                        ( drawAnotherCardIntoHand model
+                            |> checkIfDeckIsEmpty
+                            |> moveOnToNextPlayer Nothing
+                        , Cmd.none
+                        )
+
+                    else
+                        ( model, Cmd.none )
 
                 DeclaringWildCardColor ->
                     ( model, Cmd.none )
 
-                PlayerWonTheGame ->
+                PlayerWonTheGame _ ->
                     ( model, Cmd.none )
 
         PlayerClickedCardInHand card ->
@@ -97,16 +136,18 @@ update msg model =
 
                 Just topCardOnPile ->
                     if
-                        Card.isOkayToPlay
-                            { declaredColor = model.declaredColor
-                            , topCardOnPile = topCardOnPile
-                            , cardFromHand = card
-                            }
+                        isHumanPlayersTurn model
+                            && Card.isOkayToPlay
+                                { declaredColor = model.declaredColor
+                                , topCardOnPile = topCardOnPile
+                                , cardFromHand = card
+                                }
                     then
                         ( playCardOntoPile card model
                             |> checkIfGameOver
                             |> checkIfPlayedWildCard card
                             |> checkIfDeckIsEmpty
+                            |> moveOnToNextPlayer (Just card)
                         , Cmd.none
                         )
 
@@ -124,10 +165,42 @@ update msg model =
         PlayerClickedPlayAgain ->
             ( startNewGame model, Cmd.none )
 
+        ComputerTakesTurn ->
+            case model.phase of
+                ReadyToPlay ->
+                    ( model, Cmd.none )
+
+                PlayingGame ->
+                    ( haveComputerTakeTurn model
+                        |> checkIfGameOver
+                        |> checkIfDeckIsEmpty
+                    , Cmd.none
+                    )
+
+                DeclaringWildCardColor ->
+                    ( model, Cmd.none )
+
+                PlayerWonTheGame _ ->
+                    ( model, Cmd.none )
+
+
+isHumanPlayersTurn : Model -> Bool
+isHumanPlayersTurn model =
+    0 == model.currentPlayerId
+
+
+isComputersTurn : Model -> Bool
+isComputersTurn model =
+    model.currentPlayerId > 0
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    if isComputersTurn model then
+        Time.every 1000 (\_ -> ComputerTakesTurn)
+
+    else
+        Sub.none
 
 
 startNewGame : Model -> Model
@@ -137,23 +210,58 @@ startNewGame model =
         newDeck =
             Deck.new (Random.initialSeed model.seed)
 
-        afterDraw7 : { cards : List Card, deck : Deck }
-        afterDraw7 =
+        afterDrawPlayerHand : { cards : List Card, deck : Deck }
+        afterDrawPlayerHand =
             Deck.draw 7 newDeck
 
-        afterDraw8 : { cards : List Card, deck : Deck }
-        afterDraw8 =
-            Deck.draw 1 afterDraw7.deck
+        computerPlayerCount : Int
+        computerPlayerCount =
+            Dict.size model.computerHands
+
+        afterDrawingToComputers :
+            { deck : Deck
+            , computerHands : Dict PlayerId (List Card)
+            }
+        afterDrawingToComputers =
+            Dict.foldl loop
+                { deck = afterDrawPlayerHand.deck
+                , computerHands = model.computerHands
+                }
+                model.computerHands
+
+        loop :
+            PlayerId
+            -> List Card
+            ->
+                { deck : Deck
+                , computerHands : Dict PlayerId (List Card)
+                }
+            ->
+                { deck : Deck
+                , computerHands : Dict PlayerId (List Card)
+                }
+        loop playerId currentHand { deck, computerHands } =
+            let
+                afterDrawing =
+                    Deck.draw 7 deck
+            in
+            { computerHands = Dict.insert playerId afterDrawing.cards computerHands
+            , deck = afterDrawing.deck
+            }
+
+        afterDrawingPileCard : { cards : List Card, deck : Deck }
+        afterDrawingPileCard =
+            Deck.draw 1 afterDrawingToComputers.deck
 
         maybeCardToAddToPile : Maybe Card
         maybeCardToAddToPile =
-            List.head afterDraw8.cards
+            List.head afterDrawingPileCard.cards
 
         shouldDrawAnotherCard : Bool
         shouldDrawAnotherCard =
             case maybeCardToAddToPile of
                 Just card ->
-                    Card.isWild card
+                    Card.isOneOfTheWildCards card
 
                 Nothing ->
                     False
@@ -162,9 +270,11 @@ startNewGame model =
         updatedModel =
             { model
                 | phase = PlayingGame
+                , currentPlayerId = 0
                 , seed = model.seed + 1
-                , deck = afterDraw8.deck
-                , hand = afterDraw7.cards
+                , deck = afterDrawingPileCard.deck
+                , playersHand = afterDrawPlayerHand.cards
+                , computerHands = afterDrawingToComputers.computerHands
                 , pile =
                     case maybeCardToAddToPile of
                         Just card ->
@@ -196,7 +306,7 @@ drawAnotherCardOntoPile model =
         shouldDrawAnotherCard =
             case maybeCard of
                 Just card ->
-                    Card.isWild card
+                    Card.isOneOfTheWildCards card
 
                 Nothing ->
                     False
@@ -234,43 +344,172 @@ drawAnotherCardIntoHand model =
     in
     { model
         | deck = updated.deck
-        , hand =
+        , playersHand =
             case maybeCard of
                 Just card ->
-                    model.hand ++ [ card ]
+                    model.playersHand ++ [ card ]
 
                 Nothing ->
-                    model.hand
+                    model.playersHand
     }
 
 
 playCardOntoPile : Card -> Model -> Model
 playCardOntoPile card model =
-    let
-        doesNotHaveMatchingId : Card -> Bool
-        doesNotHaveMatchingId cardInHand =
-            Card.toUniqueId card /= Card.toUniqueId cardInHand
-    in
     { model
-        | hand = List.filter doesNotHaveMatchingId model.hand
+        | playersHand = List.filter (doesNotHaveMatchingId card) model.playersHand
         , pile = card :: model.pile
     }
 
 
+doesNotHaveMatchingId : Card -> Card -> Bool
+doesNotHaveMatchingId card1 card2 =
+    Card.toUniqueId card1 /= Card.toUniqueId card2
+
+
+haveComputerTakeTurn : Model -> Model
+haveComputerTakeTurn model =
+    let
+        findPlayableCardsInHand : Card -> List Card -> List Card
+        findPlayableCardsInHand topCardOnPile entireHand =
+            entireHand
+                |> List.filter
+                    (\card ->
+                        Card.isOkayToPlay
+                            { declaredColor = model.declaredColor
+                            , topCardOnPile = topCardOnPile
+                            , cardFromHand = card
+                            }
+                    )
+    in
+    case ( List.head model.pile, Dict.get model.currentPlayerId model.computerHands ) of
+        ( Just topCardOnPile, Just hand ) ->
+            let
+                playableCards : List Card
+                playableCards =
+                    findPlayableCardsInHand topCardOnPile hand
+
+                ( wildCards, nonWildCards ) =
+                    List.partition Card.isOneOfTheWildCards
+                        playableCards
+
+                randomlySelectedNonWildCard : Maybe Card
+                randomlySelectedNonWildCard =
+                    Random.initialSeed model.seed
+                        |> Random.step (Random.List.choose nonWildCards)
+                        |> Tuple.first
+                        |> Tuple.first
+
+                randomlySelectedWildCard : Maybe Card
+                randomlySelectedWildCard =
+                    Random.initialSeed model.seed
+                        |> Random.step (Random.List.choose wildCards)
+                        |> Tuple.first
+                        |> Tuple.first
+
+                cardToPlay : Maybe Card
+                cardToPlay =
+                    case ( randomlySelectedNonWildCard, randomlySelectedWildCard ) of
+                        ( Just nonWildCard, _ ) ->
+                            Just nonWildCard
+
+                        ( _, Just wildCard ) ->
+                            Just wildCard
+
+                        _ ->
+                            Nothing
+
+                removeCardFromComputersHand : Card -> Dict PlayerId (List Card)
+                removeCardFromComputersHand card =
+                    Dict.update model.currentPlayerId
+                        (\maybeComputersHand ->
+                            case maybeComputersHand of
+                                Just computersHand ->
+                                    Just (List.filter (doesNotHaveMatchingId card) computersHand)
+
+                                Nothing ->
+                                    Nothing
+                        )
+                        model.computerHands
+
+                addCardsToComputersHand : List Card -> Dict PlayerId (List Card)
+                addCardsToComputersHand newCards =
+                    Dict.update model.currentPlayerId
+                        (\maybeComputersHand ->
+                            case maybeComputersHand of
+                                Just computersHand ->
+                                    Just (computersHand ++ newCards)
+
+                                Nothing ->
+                                    Nothing
+                        )
+                        model.computerHands
+
+                computerDeclaredWild : Card -> Maybe Card.Color
+                computerDeclaredWild card =
+                    if Card.isOneOfTheWildCards card then
+                        Random.initialSeed model.seed
+                            |> Random.step (Random.List.choose [ Card.Red, Card.Yellow, Card.Green, Card.Blue ])
+                            |> Tuple.first
+                            |> Tuple.first
+
+                    else
+                        Nothing
+            in
+            case cardToPlay of
+                Just card ->
+                    { model
+                        | seed = model.seed + 1
+                        , computerHands = removeCardFromComputersHand card
+                        , pile = card :: model.pile
+                        , declaredColor = computerDeclaredWild card
+                    }
+                        |> moveOnToNextPlayer (Just card)
+
+                Nothing ->
+                    let
+                        afterComputerDraws =
+                            Deck.draw 1 model.deck
+                    in
+                    { model
+                        | seed = model.seed + 1
+                        , computerHands = addCardsToComputersHand afterComputerDraws.cards
+                        , deck = afterComputerDraws.deck
+                    }
+                        |> moveOnToNextPlayer Nothing
+
+        _ ->
+            model
+
+
 checkIfGameOver : Model -> Model
 checkIfGameOver model =
-    if List.isEmpty model.hand then
-        { model | phase = PlayerWonTheGame }
+    if List.isEmpty model.playersHand then
+        { model | phase = PlayerWonTheGame 0 }
 
     else
-        model
+        case computerIdWithoutCards model of
+            Just computerId ->
+                { model | phase = PlayerWonTheGame computerId }
+
+            Nothing ->
+                model
+
+
+computerIdWithoutCards : Model -> Maybe PlayerId
+computerIdWithoutCards model =
+    Dict.filter
+        (\_ hand -> List.isEmpty hand)
+        model.computerHands
+        |> Dict.keys
+        |> List.head
 
 
 checkIfPlayedWildCard : Card -> Model -> Model
 checkIfPlayedWildCard card model =
     case model.phase of
         PlayingGame ->
-            if Card.isWild card then
+            if Card.isOneOfTheWildCards card then
                 { model | phase = DeclaringWildCardColor }
 
             else
@@ -300,6 +539,73 @@ checkIfDeckIsEmpty model =
         model
 
 
+moveOnToNextPlayer : Maybe Card -> Model -> Model
+moveOnToNextPlayer maybeCardPlayed model =
+    let
+        totalPlayerCount : Int
+        totalPlayerCount =
+            1 + Dict.size model.computerHands
+    in
+    case maybeCardPlayed of
+        Just cardPlayed ->
+            if Card.isReverse cardPlayed then
+                { model
+                    | currentPlayerId =
+                        getNextPlayerId
+                            { distance = 1
+                            , direction = reverseDirection model.direction
+                            , total = totalPlayerCount
+                            , currentPlayerId = model.currentPlayerId
+                            }
+                    , direction = reverseDirection model.direction
+                }
+
+            else if Card.isSkip cardPlayed || Card.isDrawTwo cardPlayed || Card.isWildDraw4 cardPlayed then
+                { model
+                    | currentPlayerId =
+                        getNextPlayerId
+                            { distance = 2
+                            , direction = model.direction
+                            , total = totalPlayerCount
+                            , currentPlayerId = model.currentPlayerId
+                            }
+                }
+
+            else
+                { model
+                    | currentPlayerId =
+                        getNextPlayerId
+                            { distance = 1
+                            , direction = model.direction
+                            , total = totalPlayerCount
+                            , currentPlayerId = model.currentPlayerId
+                            }
+                }
+
+        Nothing ->
+            { model
+                | currentPlayerId =
+                    getNextPlayerId
+                        { distance = 1
+                        , direction = model.direction
+                        , total = totalPlayerCount
+                        , currentPlayerId = model.currentPlayerId
+                        }
+            }
+
+
+getNextPlayerId : { distance : Int, direction : Direction, total : Int, currentPlayerId : PlayerId } -> PlayerId
+getNextPlayerId options =
+    case options.direction of
+        Clockwise ->
+            (options.currentPlayerId + options.distance)
+                |> modBy options.total
+
+        CounterClockwise ->
+            (options.currentPlayerId - options.distance)
+                |> modBy options.total
+
+
 
 -- VIEW
 
@@ -309,6 +615,7 @@ view model =
     Html.div [ Html.Attributes.class "game" ]
         [ viewGitHubLink
         , viewPlayArea model
+        , viewComputerHands model
         , viewPlayerHand model
         , viewDialog model
         ]
@@ -366,8 +673,45 @@ viewDeck model =
             [ Card.viewBackOfCard ]
 
 
+viewComputerHands : Model -> Html Msg
+viewComputerHands model =
+    let
+        viewComputerHand : Int -> Side -> Html Msg
+        viewComputerHand id side =
+            case Dict.get id model.computerHands of
+                Just hand ->
+                    viewHandOnSide
+                        { side = side
+                        , hand = hand
+                        }
+
+                Nothing ->
+                    Html.text ""
+    in
+    Html.div [ Html.Attributes.class "computer-hands" ]
+        [ viewComputerHand 1 Left
+        , viewComputerHand 2 Top
+        , viewComputerHand 3 Right
+        ]
+
+
 viewPlayerHand : Model -> Html Msg
 viewPlayerHand model =
+    viewHandOnSide
+        { side = Bottom
+        , hand = model.playersHand
+        }
+
+
+type Side
+    = Top
+    | Left
+    | Right
+    | Bottom
+
+
+viewHandOnSide : { side : Side, hand : List Card } -> Html Msg
+viewHandOnSide options =
     let
         toKeyedNodeTuple : Card -> ( String, Html Msg )
         toKeyedNodeTuple card =
@@ -378,10 +722,14 @@ viewPlayerHand model =
     Html.Keyed.node "div"
         [ Html.Attributes.class "hand"
         , Html.Attributes.classList
-            [ ( "hand--has-cards", not (List.isEmpty model.hand) )
+            [ ( "hand--has-cards", not (List.isEmpty options.hand) )
+            , ( "hand--top", options.side == Top )
+            , ( "hand--left", options.side == Left )
+            , ( "hand--right", options.side == Right )
+            , ( "hand--bottom", options.side == Bottom )
             ]
         ]
-        (List.map toKeyedNodeTuple model.hand)
+        (List.map toKeyedNodeTuple options.hand)
 
 
 viewCardInHand : Card -> Html Msg
@@ -399,8 +747,11 @@ viewDialog model =
         DeclaringWildCardColor ->
             viewDeclareColorDialog model
 
-        PlayerWonTheGame ->
+        PlayerWonTheGame 0 ->
             viewYouWonDialog model
+
+        PlayerWonTheGame id ->
+            viewYouLostDialog id model
 
         _ ->
             Html.text ""
@@ -438,6 +789,23 @@ viewYouWonDialog model =
             , Html.Attributes.class "button"
             ]
             [ Html.text "Play again!" ]
+        ]
+
+
+viewYouLostDialog : PlayerId -> Model -> Html Msg
+viewYouLostDialog idOfPlayerWhoWon model =
+    viewDialogWithContent
+        [ Html.p [ Html.Attributes.class "dialog__message" ]
+            [ Html.text
+                ("Computer {{id}} won..."
+                    |> String.replace "{{id}}" (String.fromInt idOfPlayerWhoWon)
+                )
+            ]
+        , Html.button
+            [ Html.Events.onClick PlayerClickedPlayAgain
+            , Html.Attributes.class "button"
+            ]
+            [ Html.text "Play again?" ]
         ]
 
 

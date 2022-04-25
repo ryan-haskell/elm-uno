@@ -1,17 +1,26 @@
 module Card exposing
-    ( Card
-    , Color(..)
-    , colorToName
-    , isOkayToPlay
-    , isWild
+    ( Card, unshuffledDeck
     , shuffle
-    , toUniqueId
-    , unshuffledDeck
-    , view
-    , viewBackOfCard
-    , viewEmptyDeck
-    , viewEmptyPile
+    , isOkayToPlay
+    , isReverse, isSkip, isDrawTwo, isWildDraw4
+    , view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
+    , Color(..), colorToName
+    , isOneOfTheWildCards, toUniqueId
     )
+
+{-|
+
+@docs Card, unshuffledDeck
+@docs shuffle
+
+@docs isOkayToPlay
+@docs isReverse, isSkip, isDrawTwo, isWild, isWildDraw4
+
+@docs view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
+
+@docs Color, colorToName
+
+-}
 
 import Html exposing (Html)
 import Random
@@ -91,10 +100,50 @@ isOkayToPlay options =
         ]
 
 
-isWild : Card -> Bool
-isWild card =
+isOneOfTheWildCards : Card -> Bool
+isOneOfTheWildCards card =
     toBasicInformation card
         |> .isWild
+
+
+isReverse : Card -> Bool
+isReverse (Card card) =
+    case card.kind of
+        ReverseCard _ ->
+            True
+
+        _ ->
+            False
+
+
+isSkip : Card -> Bool
+isSkip (Card card) =
+    case card.kind of
+        SkipCard _ ->
+            True
+
+        _ ->
+            False
+
+
+isDrawTwo : Card -> Bool
+isDrawTwo (Card card) =
+    case card.kind of
+        DrawTwoCard _ ->
+            True
+
+        _ ->
+            False
+
+
+isWildDraw4 : Card -> Bool
+isWildDraw4 (Card card) =
+    case card.kind of
+        WildDraw4Card ->
+            True
+
+        _ ->
+            False
 
 
 type Value
