@@ -129,6 +129,7 @@ button {
   padding: 2rem;
 
   display: flex;
+  justify-content: center;
   max-width: 800px;
 
   transition: transform 300ms ease-in;
@@ -199,6 +200,7 @@ button {
 }
 
 .hand .hand__card-button {
+  max-width: 120px;
   transition: transform 300ms ease-in-out;
 }
 
