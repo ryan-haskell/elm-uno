@@ -765,6 +765,7 @@ viewComputerHands model =
                         { side = side
                         , hand = hand
                         , isCurrentlyPlaying = id == model.currentPlayerId
+                        , shouldHideCards = True
                         }
 
                 Nothing ->
@@ -783,6 +784,7 @@ viewPlayerHand model =
         { side = Bottom
         , hand = model.playersHand
         , isCurrentlyPlaying = 0 == model.currentPlayerId
+        , shouldHideCards = False
         }
 
 
@@ -793,13 +795,20 @@ type Side
     | Bottom
 
 
-viewHandOnSide : { side : Side, hand : List Card, isCurrentlyPlaying : Bool } -> Html Msg
+viewHandOnSide :
+    { side : Side
+    , hand : List Card
+    , isCurrentlyPlaying : Bool
+    , shouldHideCards : Bool
+    }
+    -> Html Msg
 viewHandOnSide options =
     let
         toKeyedNodeTuple : Card -> ( String, Html Msg )
         toKeyedNodeTuple card =
             ( Card.toUniqueId card
-            , viewCardInHand card
+            , viewCardInHand options.shouldHideCards
+                card
             )
     in
     Html.Keyed.node "div"
@@ -816,13 +825,18 @@ viewHandOnSide options =
         (List.map toKeyedNodeTuple options.hand)
 
 
-viewCardInHand : Card -> Html Msg
-viewCardInHand card =
+viewCardInHand : Bool -> Card -> Html Msg
+viewCardInHand shouldHideCards card =
     Html.button
         [ Html.Attributes.class "hand__card-button"
         , Html.Events.onClick (PlayerClickedCardInHand card)
         ]
-        [ Card.view card ]
+        [ if shouldHideCards then
+            Card.viewBackOfCard
+
+          else
+            Card.view card
+        ]
 
 
 viewDialog : Model -> Html Msg
