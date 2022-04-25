@@ -147,6 +147,7 @@ update msg model =
                             |> checkIfGameOver
                             |> checkIfPlayedWildCard card
                             |> checkIfDeckIsEmpty
+                            |> checkIfDraw2OrDraw4 card
                             |> moveOnToNextPlayer (Just card)
                         , Cmd.none
                         )
@@ -197,7 +198,7 @@ isComputersTurn model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if isComputersTurn model then
-        Time.every 1000 (\_ -> ComputerTakesTurn)
+        Time.every 1500 (\_ -> ComputerTakesTurn)
 
     else
         Sub.none
@@ -419,37 +420,19 @@ haveComputerTakeTurn model =
                         _ ->
                             Nothing
 
-                removeCardFromComputersHand : Card -> Dict PlayerId (List Card)
-                removeCardFromComputersHand card =
-                    Dict.update model.currentPlayerId
-                        (\maybeComputersHand ->
-                            case maybeComputersHand of
-                                Just computersHand ->
-                                    Just (List.filter (doesNotHaveMatchingId card) computersHand)
-
-                                Nothing ->
-                                    Nothing
-                        )
-                        model.computerHands
-
-                addCardsToComputersHand : List Card -> Dict PlayerId (List Card)
-                addCardsToComputersHand newCards =
-                    Dict.update model.currentPlayerId
-                        (\maybeComputersHand ->
-                            case maybeComputersHand of
-                                Just computersHand ->
-                                    Just (computersHand ++ newCards)
-
-                                Nothing ->
-                                    Nothing
-                        )
-                        model.computerHands
-
-                computerDeclaredWild : Card -> Maybe Card.Color
-                computerDeclaredWild card =
+                computerDeclaredWild : Card -> List Card.Color -> Maybe Card.Color
+                computerDeclaredWild card colorsOfRemainingCards =
                     if Card.isOneOfTheWildCards card then
                         Random.initialSeed model.seed
-                            |> Random.step (Random.List.choose [ Card.Red, Card.Yellow, Card.Green, Card.Blue ])
+                            |> Random.step
+                                (Random.List.choose
+                                    (if List.isEmpty colorsOfRemainingCards then
+                                        [ Card.Red, Card.Yellow, Card.Green, Card.Blue ]
+
+                                     else
+                                        colorsOfRemainingCards
+                                    )
+                                )
                             |> Tuple.first
                             |> Tuple.first
 
@@ -458,12 +441,28 @@ haveComputerTakeTurn model =
             in
             case cardToPlay of
                 Just card ->
+                    let
+                        computerHandsWithoutCard : Dict Int (List Card)
+                        computerHandsWithoutCard =
+                            removeCardFromComputersHand model.currentPlayerId
+                                card
+                                model.computerHands
+
+                        remainingCards : List Card
+                        remainingCards =
+                            computerHandsWithoutCard
+                                |> Dict.get model.currentPlayerId
+                                |> Maybe.withDefault []
+                    in
                     { model
                         | seed = model.seed + 1
-                        , computerHands = removeCardFromComputersHand card
+                        , computerHands = computerHandsWithoutCard
                         , pile = card :: model.pile
-                        , declaredColor = computerDeclaredWild card
+                        , declaredColor =
+                            computerDeclaredWild card
+                                (Card.getColorsForCards remainingCards)
                     }
+                        |> checkIfDraw2OrDraw4 card
                         |> moveOnToNextPlayer (Just card)
 
                 Nothing ->
@@ -473,13 +472,89 @@ haveComputerTakeTurn model =
                     in
                     { model
                         | seed = model.seed + 1
-                        , computerHands = addCardsToComputersHand afterComputerDraws.cards
+                        , computerHands =
+                            addCardsToComputersHand model.currentPlayerId
+                                afterComputerDraws.cards
+                                model.computerHands
                         , deck = afterComputerDraws.deck
                     }
                         |> moveOnToNextPlayer Nothing
 
         _ ->
             model
+
+
+removeCardFromComputersHand : PlayerId -> Card -> Dict PlayerId (List Card) -> Dict PlayerId (List Card)
+removeCardFromComputersHand id card computerHands =
+    Dict.update id
+        (\maybeComputersHand ->
+            case maybeComputersHand of
+                Just computersHand ->
+                    Just (List.filter (doesNotHaveMatchingId card) computersHand)
+
+                Nothing ->
+                    Nothing
+        )
+        computerHands
+
+
+addCardsToComputersHand : PlayerId -> List Card -> Dict PlayerId (List Card) -> Dict PlayerId (List Card)
+addCardsToComputersHand id newCards computerHands =
+    Dict.update id
+        (\maybeComputersHand ->
+            case maybeComputersHand of
+                Just computersHand ->
+                    Just (computersHand ++ newCards)
+
+                Nothing ->
+                    Nothing
+        )
+        computerHands
+
+
+checkIfDraw2OrDraw4 : Card -> Model -> Model
+checkIfDraw2OrDraw4 card model =
+    let
+        nextPlayerId =
+            getNextPlayerId
+                { total = getTotalPlayers model
+                , distance = 1
+                , direction = model.direction
+                , currentPlayerId = model.currentPlayerId
+                }
+
+        giveCards : Int -> Model
+        giveCards amount =
+            let
+                afterDrawing =
+                    Deck.draw amount model.deck
+            in
+            case nextPlayerId of
+                0 ->
+                    { model | playersHand = model.playersHand ++ afterDrawing.cards }
+
+                computerId ->
+                    { model
+                        | computerHands =
+                            addCardsToComputersHand computerId
+                                afterDrawing.cards
+                                model.computerHands
+                        , deck = afterDrawing.deck
+                    }
+    in
+    if Card.isDrawTwo card then
+        giveCards 2
+
+    else if Card.isWildDraw4 card then
+        giveCards 4
+
+    else
+        model
+
+
+getTotalPlayers : Model -> Int
+getTotalPlayers model =
+    1 + Dict.size model.computerHands
 
 
 checkIfGameOver : Model -> Model
@@ -544,7 +619,7 @@ moveOnToNextPlayer maybeCardPlayed model =
     let
         totalPlayerCount : Int
         totalPlayerCount =
-            1 + Dict.size model.computerHands
+            getTotalPlayers model
     in
     case maybeCardPlayed of
         Just cardPlayed ->
@@ -594,7 +669,13 @@ moveOnToNextPlayer maybeCardPlayed model =
             }
 
 
-getNextPlayerId : { distance : Int, direction : Direction, total : Int, currentPlayerId : PlayerId } -> PlayerId
+getNextPlayerId :
+    { distance : Int
+    , direction : Direction
+    , total : Int
+    , currentPlayerId : PlayerId
+    }
+    -> PlayerId
 getNextPlayerId options =
     case options.direction of
         Clockwise ->

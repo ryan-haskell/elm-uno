@@ -3,9 +3,10 @@ module Card exposing
     , shuffle
     , isOkayToPlay
     , isReverse, isSkip, isDrawTwo, isWildDraw4
+    , isOneOfTheWildCards
     , view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
-    , Color(..), colorToName
-    , isOneOfTheWildCards, toUniqueId
+    , toUniqueId
+    , Color(..), colorToName, getColorsForCards
     )
 
 {-|
@@ -14,11 +15,13 @@ module Card exposing
 @docs shuffle
 
 @docs isOkayToPlay
-@docs isReverse, isSkip, isDrawTwo, isWild, isWildDraw4
+@docs isReverse, isSkip, isDrawTwo, isWildDraw4
+@docs isOneOfTheWildCards
 
 @docs view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
+@docs toUniqueId
 
-@docs Color, colorToName
+@docs Color, colorToName, getColorsForCards
 
 -}
 
@@ -352,6 +355,13 @@ colorToName color =
 
         Blue ->
             "Blue"
+
+
+getColorsForCards : List Card -> List Color
+getColorsForCards cards =
+    cards
+        |> List.map toBasicInformation
+        |> List.filterMap .color
 
 
 toHexColor : Color -> String

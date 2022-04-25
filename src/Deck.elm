@@ -42,13 +42,10 @@ reshuffle seed cards =
 
 draw : Int -> Deck -> { cards : List Card, deck : Deck }
 draw numberOfCards (Deck { cards }) =
+    -- TODO: Fail if couldn't draw enough cards
     { cards = List.take numberOfCards cards
     , deck = Deck { cards = List.drop numberOfCards cards }
     }
-
-
-
---
 
 
 shuffle : Random.Seed -> List Card -> List Card
