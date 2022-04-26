@@ -5,7 +5,7 @@ module Card exposing
     , isReverse, isSkip, isDrawTwo, isWildDraw4
     , isOneOfTheWildCards
     , view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
-    , toUniqueId
+    , Id, toUniqueId
     , Color(..), colorToName, getColorsForCards
     , blueSkipCard, redDrawTwoCard
     )
@@ -20,7 +20,8 @@ module Card exposing
 @docs isOneOfTheWildCards
 
 @docs view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
-@docs toUniqueId
+
+@docs Id, toUniqueId
 
 @docs Color, colorToName, getColorsForCards
 
@@ -42,8 +43,12 @@ type Card
     = Card Internals
 
 
+type alias Id =
+    String
+
+
 type alias Internals =
-    { id : String
+    { id : Id
     , kind : CardKind
     }
 

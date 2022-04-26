@@ -4,6 +4,7 @@ import Card exposing (Card)
 import Deck
 import Dict
 import Expect
+import Hand
 import Main
 import Test exposing (Test)
 
@@ -137,14 +138,14 @@ getSizeOfComputersHand : Int -> Main.Model -> Int
 getSizeOfComputersHand int model =
     model.computerHands
         |> Dict.get int
-        |> Maybe.withDefault []
-        |> List.length
+        |> Maybe.withDefault Hand.empty
+        |> Hand.size
 
 
 getSizeOfPlayersHand : Main.Model -> Int
 getSizeOfPlayersHand model =
     model.playersHand
-        |> List.length
+        |> Hand.size
 
 
 initialModel : Main.Model
