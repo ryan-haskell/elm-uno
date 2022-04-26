@@ -1,6 +1,7 @@
 module Main exposing (Model, checkIfDraw2OrDraw4, init, main)
 
 import Browser
+import Browser.Dom
 import Card exposing (Card)
 import Deck exposing (Deck)
 import Dict exposing (Dict)
@@ -8,10 +9,12 @@ import Hand exposing (Hand)
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
-import Html.Keyed
 import Pile exposing (Pile)
+import Platform exposing (Task)
+import Process
 import Random
 import Random.List
+import Task
 import Time
 
 
@@ -43,7 +46,21 @@ type alias Model =
     , playersHand : Hand
     , computerHands : Dict PlayerId Hand
     , declaredColor : Maybe Card.Color
+    , floatingCard : FloatingCardState
     , seed : Int
+    }
+
+
+type FloatingCardState
+    = NoFloatingCard
+    | FloatingCardAtSource FloatingCard
+    | FloatingCardAtDestination FloatingCard
+
+
+type alias FloatingCard =
+    { card : Card
+    , source : BoundingRect
+    , destination : BoundingRect
     }
 
 
@@ -88,6 +105,7 @@ init flags =
                 , ( 3, Hand.empty )
                 ]
       , declaredColor = Nothing
+      , floatingCard = NoFloatingCard
       , seed = flags.seed
       }
     , Cmd.none
@@ -104,6 +122,25 @@ type Msg
     | PlayerClickedPlayAgain
     | PlayerDeclaredColor Card.Color
     | ComputerTakesTurn
+    | AnimationHandToPileStep1
+        { card : Card
+        , result :
+            Result
+                Browser.Dom.Error
+                { cardElement : BoundingRect
+                , pileElement : BoundingRect
+                }
+        }
+    | AnimationHandToPileStep2 FloatingCard
+    | AnimationHandToPileStep3 Card
+
+
+type alias BoundingRect =
+    { x : Float
+    , y : Float
+    , width : Float
+    , height : Float
+    }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -145,17 +182,60 @@ update msg model =
                                 , cardFromHand = card
                                 }
                     then
-                        ( playCardOntoPile card model
-                            |> checkIfGameOver
-                            |> checkIfPlayedWildCard card
-                            |> checkIfDeckIsEmpty
-                            |> checkIfDraw2OrDraw4 card
-                            |> moveOnToNextPlayer (Just card)
-                        , Cmd.none
+                        ( model
+                        , getBoundsOfCardAndPile
+                            { card = card
+                            , onComplete = AnimationHandToPileStep1
+                            }
                         )
 
                     else
                         ( model, Cmd.none )
+
+        AnimationHandToPileStep1 { card, result } ->
+            case result of
+                Ok { cardElement, pileElement } ->
+                    let
+                        floatingCard : FloatingCard
+                        floatingCard =
+                            { card = card
+                            , source = cardElement
+                            , destination = pileElement
+                            }
+                    in
+                    ( { model | floatingCard = FloatingCardAtSource floatingCard }
+                    , delayMessage
+                        { delayInMs = 100
+                        , msg = AnimationHandToPileStep2 floatingCard
+                        }
+                    )
+
+                Err _ ->
+                    ( model
+                    , delayMessage
+                        { delayInMs = 0
+                        , msg = AnimationHandToPileStep3 card
+                        }
+                    )
+
+        AnimationHandToPileStep2 floatingCard ->
+            ( { model | floatingCard = FloatingCardAtDestination floatingCard }
+            , delayMessage
+                { delayInMs = 800
+                , msg = AnimationHandToPileStep3 floatingCard.card
+                }
+            )
+
+        AnimationHandToPileStep3 card ->
+            ( playCardOntoPile card model
+                |> checkIfGameOver
+                |> checkIfPlayedWildCard card
+                |> checkIfDeckIsEmpty
+                |> checkIfDraw2OrDraw4 card
+                |> moveOnToNextPlayer (Just card)
+                |> removeFloatingCard
+            , Cmd.none
+            )
 
         PlayerDeclaredColor color ->
             ( { model
@@ -185,6 +265,64 @@ update msg model =
 
                 PlayerWonTheGame _ ->
                     ( model, Cmd.none )
+
+
+removeFloatingCard : Model -> Model
+removeFloatingCard model =
+    { model | floatingCard = NoFloatingCard }
+
+
+delayMessage : { delayInMs : Int, msg : msg } -> Cmd msg
+delayMessage options =
+    Process.sleep (toFloat options.delayInMs)
+        |> Task.map (\_ -> options.msg)
+        |> Task.perform (\msg -> msg)
+
+
+getBoundsOfCardAndPile :
+    { card : Card
+    , onComplete :
+        { card : Card
+        , result :
+            Result
+                Browser.Dom.Error
+                { cardElement : BoundingRect
+                , pileElement : BoundingRect
+                }
+        }
+        -> msg
+    }
+    -> Cmd msg
+getBoundsOfCardAndPile { card, onComplete } =
+    let
+        cardId : Card.Id
+        cardId =
+            Card.toUniqueId card
+
+        task :
+            Task
+                Browser.Dom.Error
+                { cardElement : BoundingRect
+                , pileElement : BoundingRect
+                }
+        task =
+            Task.map2
+                (\card_ pile_ ->
+                    { cardElement = card_.element
+                    , pileElement = pile_.element
+                    }
+                )
+                (Browser.Dom.getElement cardId)
+                (Browser.Dom.getElement "pile")
+    in
+    task
+        |> Task.attempt
+            (\result ->
+                onComplete
+                    { card = card
+                    , result = result
+                    }
+            )
 
 
 isHumanPlayersTurn : Model -> Bool
@@ -706,6 +844,7 @@ view model =
         , viewPlayArea model
         , viewComputerHands model
         , viewPlayerHand model
+        , viewFloatingCard model
         , viewDialog model
         ]
 
@@ -726,7 +865,10 @@ viewPlayArea : Model -> Html Msg
 viewPlayArea model =
     Html.div [ Html.Attributes.class "play-area" ]
         [ Pile.view model.pile
-        , viewDeck model
+        , Deck.view
+            { onClick = PlayerClickedDeck
+            , deck = model.deck
+            }
         , viewDeclaredColor model
         ]
 
@@ -741,17 +883,6 @@ viewDeclaredColor model =
             Html.text ""
 
 
-viewDeck : Model -> Html Msg
-viewDeck model =
-    if Deck.isEmpty model.deck then
-        Card.viewEmptyDeck
-
-    else
-        Html.button
-            [ Html.Events.onClick PlayerClickedDeck ]
-            [ Card.viewBackOfCard ]
-
-
 viewComputerHands : Model -> Html Msg
 viewComputerHands model =
     let
@@ -760,7 +891,8 @@ viewComputerHands model =
             case Dict.get id model.computerHands of
                 Just hand ->
                     Hand.view
-                        { side = side
+                        { cardToHide = toMaybeFloatingCard model.floatingCard
+                        , side = side
                         , hand = hand
                         , isCurrentlyPlaying = id == model.currentPlayerId
                         , shouldHideCards = True
@@ -777,10 +909,24 @@ viewComputerHands model =
         ]
 
 
+toMaybeFloatingCard : FloatingCardState -> Maybe Card
+toMaybeFloatingCard floatingCardState =
+    case floatingCardState of
+        NoFloatingCard ->
+            Nothing
+
+        FloatingCardAtSource { card } ->
+            Just card
+
+        FloatingCardAtDestination { card } ->
+            Just card
+
+
 viewPlayerHand : Model -> Html Msg
 viewPlayerHand model =
     Hand.view
-        { side = Hand.Bottom
+        { cardToHide = toMaybeFloatingCard model.floatingCard
+        , side = Hand.Bottom
         , hand = model.playersHand
         , isCurrentlyPlaying = 0 == model.currentPlayerId
         , shouldHideCards = False
@@ -862,3 +1008,37 @@ viewDialogWithContent content =
         [ Html.div [ Html.Attributes.class "dialog__background" ] []
         , Html.div [ Html.Attributes.class "dialog__content" ] content
         ]
+
+
+viewFloatingCard : Model -> Html msg
+viewFloatingCard model =
+    case model.floatingCard of
+        NoFloatingCard ->
+            Html.text ""
+
+        FloatingCardAtSource { card, source } ->
+            Html.div
+                [ Html.Attributes.class "floating-card"
+                , Html.Attributes.style "top" (px source.y)
+                , Html.Attributes.style "left" (px source.x)
+                , Html.Attributes.style "width" (px source.width)
+                , Html.Attributes.style "height" (px source.width)
+                ]
+                [ Card.view card
+                ]
+
+        FloatingCardAtDestination { card, destination } ->
+            Html.div
+                [ Html.Attributes.class "floating-card"
+                , Html.Attributes.style "top" (px destination.y)
+                , Html.Attributes.style "left" (px destination.x)
+                , Html.Attributes.style "width" (px destination.width)
+                , Html.Attributes.style "height" (px destination.width)
+                ]
+                [ Card.view card
+                ]
+
+
+px : Float -> String
+px float =
+    String.fromFloat float ++ "px"

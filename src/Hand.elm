@@ -72,7 +72,8 @@ type Side
 
 
 view :
-    { side : Side
+    { cardToHide : Maybe Card
+    , side : Side
     , hand : Hand
     , isCurrentlyPlaying : Bool
     , shouldHideCards : Bool
@@ -92,12 +93,27 @@ view options =
 
         viewCardInHand : Card -> Html msg
         viewCardInHand card =
+            let
+                shouldHideCard : Bool
+                shouldHideCard =
+                    case options.cardToHide of
+                        Just cardToHide ->
+                            Card.toUniqueId cardToHide == Card.toUniqueId card
+
+                        Nothing ->
+                            False
+            in
             Html.button
                 [ Html.Attributes.class "hand__card-button"
                 , Html.Events.onClick (options.onClick card)
+                , if shouldHideCard then
+                    Html.Attributes.style "opacity" "0"
+
+                  else
+                    Html.Attributes.style "" ""
                 ]
                 [ if options.shouldHideCards then
-                    Card.viewBackOfCard
+                    Card.viewBackOfCard card
 
                   else
                     Card.view card

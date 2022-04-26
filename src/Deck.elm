@@ -3,6 +3,7 @@ module Deck exposing
     , draw
     , isEmpty, size
     , reshuffle
+    , view
     )
 
 {-|
@@ -11,10 +12,14 @@ module Deck exposing
 @docs deal, draw
 @docs isEmpty, size
 @docs reshuffle
+@docs view
 
 -}
 
 import Card exposing (Card)
+import Html exposing (Html)
+import Html.Attributes
+import Html.Events
 import Random
 import Random.List
 
@@ -62,3 +67,21 @@ shuffle seed deck =
             Random.step (Random.List.shuffle deck) seed
     in
     shuffledDeck
+
+
+view : { onClick : msg, deck : Deck } -> Html msg
+view options =
+    let
+        (Deck { cards }) =
+            options.deck
+    in
+    Html.div [ Html.Attributes.class "deck", Html.Attributes.id "deck" ]
+        [ case List.head cards of
+            Just topCard ->
+                Html.button
+                    [ Html.Events.onClick options.onClick ]
+                    [ Card.viewBackOfCard topCard ]
+
+            Nothing ->
+                Card.viewEmptyDeck
+        ]

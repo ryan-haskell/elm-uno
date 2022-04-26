@@ -117,9 +117,13 @@ button {
   max-width: 100%;
 }
 
-.deck {}
+.deck {
+  display: flex;
+}
 
-.pile {}
+.pile {
+  display: flex;
+}
 
 .hand {
   position: fixed;
@@ -272,4 +276,9 @@ button {
 
 .github-link:hover {
   opacity: 1;
+}
+
+.floating-card {
+  position: fixed;
+  transition: top 500ms ease-out, left 500ms ease-out, width 500ms ease-out, height 500ms ease-out;
 }

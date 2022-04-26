@@ -217,37 +217,38 @@ view : Card -> Html msg
 view (Card card) =
     case card.kind of
         NumberCard { value, color } ->
-            viewNumberCard
+            viewNumberCard card.id
                 { value = value
                 , color = toHexColor color
                 }
 
         ReverseCard { color } ->
-            viewReverseCard
+            viewReverseCard card.id
                 { color = toHexColor color
                 }
 
         SkipCard { color } ->
-            viewSkipCard
+            viewSkipCard card.id
                 { color = toHexColor color
                 }
 
         DrawTwoCard { color } ->
-            viewDrawTwoCard
+            viewDrawTwoCard card.id
                 { color = toHexColor color
                 }
 
         WildCard ->
-            viewWildCard
+            viewWildCard card.id
 
         WildDraw4Card ->
-            viewWildDraw4Card
+            viewWildDraw4Card card.id
 
 
-viewBackOfCard : Html msg
-viewBackOfCard =
+viewBackOfCard : Card -> Html msg
+viewBackOfCard card =
     viewCardWithIcon
-        { color = black
+        { id = toUniqueId card
+        , color = black
         , viewCenterIcon = viewUnoCardBack
         , viewCornerIcon = Svg.g [] []
         }
@@ -448,8 +449,8 @@ toColorCard toCard color =
 -- VIEW CODE
 
 
-viewNumberCard : { color : String, value : Int } -> Svg msg
-viewNumberCard options =
+viewNumberCard : Id -> { color : String, value : Int } -> Svg msg
+viewNumberCard id options =
     let
         shouldUnderlineNumber : Bool
         shouldUnderlineNumber =
@@ -465,6 +466,7 @@ viewNumberCard options =
     in
     Svg.svg
         [ Svg.Attributes.class "card"
+        , Svg.Attributes.id id
         , Svg.Attributes.viewBox "0 0 5.5 9"
         , Svg.Attributes.width "200px"
         ]
@@ -557,46 +559,51 @@ viewNumberCard options =
         ]
 
 
-viewReverseCard : { color : String } -> Html msg
-viewReverseCard options =
+viewReverseCard : Id -> { color : String } -> Html msg
+viewReverseCard id options =
     viewCardWithIcon
-        { color = options.color
+        { id = id
+        , color = options.color
         , viewCenterIcon = viewReverseIcon
         , viewCornerIcon = viewReverseIcon
         }
 
 
-viewSkipCard : { color : String } -> Html msg
-viewSkipCard options =
+viewSkipCard : Id -> { color : String } -> Html msg
+viewSkipCard id options =
     viewCardWithIcon
-        { color = options.color
+        { id = id
+        , color = options.color
         , viewCenterIcon = viewSkipIcon
         , viewCornerIcon = viewSkipIcon
         }
 
 
-viewDrawTwoCard : { color : String } -> Html msg
-viewDrawTwoCard options =
+viewDrawTwoCard : Id -> { color : String } -> Html msg
+viewDrawTwoCard id options =
     viewCardWithIcon
-        { color = options.color
+        { id = id
+        , color = options.color
         , viewCenterIcon = viewTwoCardIcon options.color
         , viewCornerIcon = viewPlusNumberText 2
         }
 
 
-viewWildCard : Html msg
-viewWildCard =
+viewWildCard : Id -> Html msg
+viewWildCard id =
     viewCardWithIcon
-        { color = black
+        { id = id
+        , color = black
         , viewCenterIcon = viewWildIcon
         , viewCornerIcon = viewSmallWildIcon
         }
 
 
-viewWildDraw4Card : Html msg
-viewWildDraw4Card =
+viewWildDraw4Card : Id -> Html msg
+viewWildDraw4Card id =
     viewCardWithIcon
-        { color = black
+        { id = id
+        , color = black
         , viewCenterIcon =
             Svg.g []
                 [ viewWildIcon
@@ -614,7 +621,8 @@ viewWildDraw4Card =
 
 
 viewCardWithIcon :
-    { color : String
+    { id : String
+    , color : String
     , viewCenterIcon : Svg msg
     , viewCornerIcon : Svg msg
     }
@@ -622,6 +630,7 @@ viewCardWithIcon :
 viewCardWithIcon options =
     Svg.svg
         [ Svg.Attributes.class "card"
+        , Svg.Attributes.id options.id
         , Svg.Attributes.viewBox "0 0 5.5 9"
         , Svg.Attributes.width "200px"
         ]

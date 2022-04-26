@@ -16,6 +16,7 @@ module Pile exposing
 
 import Card exposing (Card)
 import Html exposing (Html)
+import Html.Attributes
 
 
 type Pile
@@ -46,9 +47,11 @@ topCard (Pile pile) =
 
 view : Pile -> Html msg
 view pile =
-    case topCard pile of
-        Nothing ->
-            Card.viewEmptyPile
+    Html.div [ Html.Attributes.class "pile", Html.Attributes.id "pile" ]
+        [ case topCard pile of
+            Nothing ->
+                Card.viewEmptyPile
 
-        Just topCard_ ->
-            Card.view topCard_
+            Just topCard_ ->
+                Card.view topCard_
+        ]
