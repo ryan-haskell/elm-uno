@@ -1,14 +1,16 @@
 module Deck exposing
     ( Deck, new
     , draw
-    , isEmpty, reshuffle
+    , isEmpty, size
+    , reshuffle
     )
 
 {-|
 
 @docs Deck, new
 @docs deal, draw
-@docs isEmpty, reshuffle
+@docs isEmpty, size
+@docs reshuffle
 
 -}
 
@@ -31,6 +33,11 @@ new seed =
 isEmpty : Deck -> Bool
 isEmpty (Deck { cards }) =
     List.isEmpty cards
+
+
+size : Deck -> Int
+size (Deck { cards }) =
+    List.length cards
 
 
 reshuffle : Random.Seed -> List Card -> Deck

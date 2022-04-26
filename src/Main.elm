@@ -1,4 +1,4 @@
-module Main exposing (main)
+module Main exposing (Model, checkIfDraw2OrDraw4, init, main)
 
 import Browser
 import Card exposing (Card)
@@ -515,6 +515,7 @@ addCardsToComputersHand id newCards computerHands =
 checkIfDraw2OrDraw4 : Card -> Model -> Model
 checkIfDraw2OrDraw4 card model =
     let
+        nextPlayerId : PlayerId
         nextPlayerId =
             getNextPlayerId
                 { total = getTotalPlayers model
@@ -526,12 +527,16 @@ checkIfDraw2OrDraw4 card model =
         giveCards : Int -> Model
         giveCards amount =
             let
+                afterDrawing : { cards : List Card, deck : Deck }
                 afterDrawing =
                     Deck.draw amount model.deck
             in
             case nextPlayerId of
                 0 ->
-                    { model | playersHand = model.playersHand ++ afterDrawing.cards }
+                    { model
+                        | playersHand = model.playersHand ++ afterDrawing.cards
+                        , deck = afterDrawing.deck
+                    }
 
                 computerId ->
                     { model

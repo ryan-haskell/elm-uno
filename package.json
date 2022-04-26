@@ -6,7 +6,9 @@
   "scripts": {
     "start": "npm i && npm run dev",
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "elm-test",
+    "test:watch": "elm-test --watch"
   },
   "author": "",
   "license": "ISC",

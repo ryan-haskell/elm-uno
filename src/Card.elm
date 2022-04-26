@@ -7,6 +7,7 @@ module Card exposing
     , view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
     , toUniqueId
     , Color(..), colorToName, getColorsForCards
+    , blueSkipCard, redDrawTwoCard
     )
 
 {-|
@@ -22,6 +23,11 @@ module Card exposing
 @docs toUniqueId
 
 @docs Color, colorToName, getColorsForCards
+
+
+### testing
+
+@docs blueSkipCard, redDrawTwoCard
 
 -}
 
@@ -929,3 +935,23 @@ white =
 black : String
 black =
     "#000000"
+
+
+
+-- FOR TESTING
+
+
+blueSkipCard : Card
+blueSkipCard =
+    Card
+        { id = "blueSkipCard"
+        , kind = SkipCard { color = Blue }
+        }
+
+
+redDrawTwoCard : Card
+redDrawTwoCard =
+    Card
+        { id = "redDrawTwoCard"
+        , kind = DrawTwoCard { color = Red }
+        }
