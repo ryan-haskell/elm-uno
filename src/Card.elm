@@ -419,7 +419,7 @@ unshuffledDeck =
 shuffle : Random.Seed -> List Card -> List Card
 shuffle seed deck =
     let
-        ( shuffledDeck, nextSeed ) =
+        ( shuffledDeck, _ ) =
             Random.step (Random.List.shuffle deck) seed
     in
     shuffledDeck

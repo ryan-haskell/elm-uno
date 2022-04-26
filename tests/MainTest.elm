@@ -1,7 +1,7 @@
 module MainTest exposing (..)
 
 import Card exposing (Card)
-import Deck exposing (Deck)
+import Deck
 import Dict
 import Expect
 import Main

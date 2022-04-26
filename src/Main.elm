@@ -8,6 +8,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html.Keyed
+import Pile exposing (Pile)
 import Random
 import Random.List
 import Time
@@ -35,7 +36,7 @@ main =
 type alias Model =
     { phase : Phase
     , deck : Deck
-    , pile : List Card
+    , pile : Pile
     , direction : Direction
     , currentPlayerId : Int
     , playersHand : List Card
@@ -75,7 +76,7 @@ init : Flags -> ( Model, Cmd Msg )
 init flags =
     ( { phase = ReadyToPlay
       , deck = Deck.new (Random.initialSeed 0)
-      , pile = []
+      , pile = Pile.empty
       , currentPlayerId = 0
       , direction = Clockwise
       , playersHand = []
@@ -130,7 +131,7 @@ update msg model =
                     ( model, Cmd.none )
 
         PlayerClickedCardInHand card ->
-            case List.head model.pile of
+            case Pile.topCard model.pile of
                 Nothing ->
                     ( model, Cmd.none )
 
@@ -215,10 +216,6 @@ startNewGame model =
         afterDrawPlayerHand =
             Deck.draw 7 newDeck
 
-        computerPlayerCount : Int
-        computerPlayerCount =
-            Dict.size model.computerHands
-
         afterDrawingToComputers :
             { deck : Deck
             , computerHands : Dict PlayerId (List Card)
@@ -241,7 +238,7 @@ startNewGame model =
                 { deck : Deck
                 , computerHands : Dict PlayerId (List Card)
                 }
-        loop playerId currentHand { deck, computerHands } =
+        loop playerId _ { deck, computerHands } =
             let
                 afterDrawing =
                     Deck.draw 7 deck
@@ -279,10 +276,11 @@ startNewGame model =
                 , pile =
                     case maybeCardToAddToPile of
                         Just card ->
-                            [ card ]
+                            Pile.empty
+                                |> Pile.addCardToTop card
 
                         Nothing ->
-                            []
+                            Pile.empty
             }
     in
     if shouldDrawAnotherCard then
@@ -319,7 +317,8 @@ drawAnotherCardOntoPile model =
                 , pile =
                     case maybeCard of
                         Just card ->
-                            card :: model.pile
+                            model.pile
+                                |> Pile.addCardToTop card
 
                         Nothing ->
                             model.pile
@@ -359,7 +358,9 @@ playCardOntoPile : Card -> Model -> Model
 playCardOntoPile card model =
     { model
         | playersHand = List.filter (doesNotHaveMatchingId card) model.playersHand
-        , pile = card :: model.pile
+        , pile =
+            model.pile
+                |> Pile.addCardToTop card
     }
 
 
@@ -383,7 +384,7 @@ haveComputerTakeTurn model =
                             }
                     )
     in
-    case ( List.head model.pile, Dict.get model.currentPlayerId model.computerHands ) of
+    case ( Pile.topCard model.pile, Dict.get model.currentPlayerId model.computerHands ) of
         ( Just topCardOnPile, Just hand ) ->
             let
                 playableCards : List Card
@@ -457,7 +458,9 @@ haveComputerTakeTurn model =
                     { model
                         | seed = model.seed + 1
                         , computerHands = computerHandsWithoutCard
-                        , pile = card :: model.pile
+                        , pile =
+                            model.pile
+                                |> Pile.addCardToTop card
                         , declaredColor =
                             computerDeclaredWild card
                                 (Card.getColorsForCards remainingCards)
@@ -603,16 +606,19 @@ checkIfDeckIsEmpty : Model -> Model
 checkIfDeckIsEmpty model =
     if Deck.isEmpty model.deck then
         let
+            ( bottomCardsOfPile, newPile ) =
+                Pile.removeBottomCards model.pile
+
             newDeck : Deck
             newDeck =
                 Deck.reshuffle
                     (Random.initialSeed model.seed)
-                    (List.drop 1 model.pile)
+                    bottomCardsOfPile
         in
         { model
             | deck = newDeck
             , seed = model.seed + 1
-            , pile = List.take 1 model.pile
+            , pile = newPile
         }
 
     else
@@ -722,7 +728,7 @@ viewGitHubLink =
 viewPlayArea : Model -> Html Msg
 viewPlayArea model =
     Html.div [ Html.Attributes.class "play-area" ]
-        [ viewPile model
+        [ Pile.view model.pile
         , viewDeck model
         , viewDeclaredColor model
         ]
@@ -736,16 +742,6 @@ viewDeclaredColor model =
 
         Nothing ->
             Html.text ""
-
-
-viewPile : Model -> Html Msg
-viewPile model =
-    case model.pile of
-        [] ->
-            Card.viewEmptyPile
-
-        topCard :: _ ->
-            Card.view topCard
 
 
 viewDeck : Model -> Html Msg
@@ -861,7 +857,7 @@ viewDialog model =
 
 
 viewDeclareColorDialog : Model -> Html Msg
-viewDeclareColorDialog model =
+viewDeclareColorDialog _ =
     let
         viewChooseColorButton color =
             Html.button
@@ -884,7 +880,7 @@ viewDeclareColorDialog model =
 
 
 viewYouWonDialog : Model -> Html Msg
-viewYouWonDialog model =
+viewYouWonDialog _ =
     viewDialogWithContent
         [ Html.p [ Html.Attributes.class "dialog__message" ] [ Html.text "You won!" ]
         , Html.button
@@ -896,7 +892,7 @@ viewYouWonDialog model =
 
 
 viewYouLostDialog : PlayerId -> Model -> Html Msg
-viewYouLostDialog idOfPlayerWhoWon model =
+viewYouLostDialog idOfPlayerWhoWon _ =
     viewDialogWithContent
         [ Html.p [ Html.Attributes.class "dialog__message" ]
             [ Html.text
