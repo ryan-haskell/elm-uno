@@ -135,7 +135,7 @@ type Msg
     | AnimationHandToPileStep2 FloatingCard
     | AnimationHandToPileComplete Card
       -- Deck to hand animation
-    | AnimationDeckToPlayerHandStep1
+    | AnimationDeckToHandStep1
         { card : Card
         , result :
             Result
@@ -144,8 +144,8 @@ type Msg
                 , deckElement : BoundingRect
                 }
         }
-    | AnimationDeckToPlayerHandStep2 FloatingCard
-    | AnimationDeckToPlayerHandComplete
+    | AnimationDeckToHandStep2 FloatingCard
+    | AnimationDeckToHandComplete
 
 
 type alias BoundingRect =
@@ -179,35 +179,6 @@ update msg model =
                 PlayerWonTheGame _ ->
                     ( model, Cmd.none )
 
-        AnimationDeckToPlayerHandStep1 { card, result } ->
-            onAnimationStart
-                { result = result
-                , model = model
-                , toFloatingCard =
-                    \{ cardElement, deckElement } ->
-                        { card = card
-                        , source = deckElement
-                        , destination = cardElement
-                        }
-                , onFailureMsg = AnimationDeckToPlayerHandComplete
-                }
-
-        AnimationDeckToPlayerHandStep2 floatingCard ->
-            animateFloatingCard
-                { model = model
-                , floatingCard = floatingCard
-                , delayInMs = 500
-                , onComplete = AnimationDeckToPlayerHandComplete
-                }
-
-        AnimationDeckToPlayerHandComplete ->
-            ( drawAnotherCardIntoHand model
-                |> checkIfDeckIsEmpty
-                |> moveOnToNextPlayer Nothing
-                |> removeFloatingCard
-            , Cmd.none
-            )
-
         PlayerClickedCardInHand card ->
             case Pile.topCard model.pile of
                 Nothing ->
@@ -231,38 +202,6 @@ update msg model =
 
                     else
                         ( model, Cmd.none )
-
-        AnimationHandToPileStep1 { card, result } ->
-            onAnimationStart
-                { model = model
-                , result = result
-                , toFloatingCard =
-                    \{ cardElement, pileElement } ->
-                        { card = card
-                        , source = cardElement
-                        , destination = pileElement
-                        }
-                , onFailureMsg = AnimationHandToPileComplete card
-                }
-
-        AnimationHandToPileStep2 floatingCard ->
-            animateFloatingCard
-                { model = model
-                , floatingCard = floatingCard
-                , delayInMs = 800
-                , onComplete = AnimationHandToPileComplete floatingCard.card
-                }
-
-        AnimationHandToPileComplete card ->
-            ( playCardOntoPile card model
-                |> checkIfGameOver
-                |> checkIfPlayedWildCard card
-                |> checkIfDeckIsEmpty
-                |> checkIfDraw2OrDraw4 card
-                |> moveOnToNextPlayer (Just card)
-                |> removeFloatingCard
-            , Cmd.none
-            )
 
         PlayerDeclaredColor color ->
             ( { model
@@ -293,15 +232,76 @@ update msg model =
                 PlayerWonTheGame _ ->
                     ( model, Cmd.none )
 
+        AnimationDeckToHandStep1 { card, result } ->
+            onAnimationStep1
+                { model = model
+                , result = result
+                , toFloatingCard =
+                    \{ cardElement, deckElement } ->
+                        { card = card
+                        , source = deckElement
+                        , destination = cardElement
+                        }
+                , onFailureMsg = AnimationDeckToHandComplete
+                }
 
-onAnimationStart :
+        AnimationDeckToHandStep2 floatingCard ->
+            onAnimationStep2
+                { model = model
+                , floatingCard = floatingCard
+                , delayInMs = 500
+                , onComplete = AnimationDeckToHandComplete
+                }
+
+        AnimationDeckToHandComplete ->
+            ( drawAnotherCardIntoHand model
+                |> checkIfDeckIsEmpty
+                |> moveOnToNextPlayer Nothing
+                |> removeFloatingCard
+            , Cmd.none
+            )
+
+        AnimationHandToPileStep1 { card, result } ->
+            onAnimationStep1
+                { model = model
+                , result = result
+                , toFloatingCard =
+                    \{ cardElement, pileElement } ->
+                        { card = card
+                        , source = cardElement
+                        , destination = pileElement
+                        }
+                , onFailureMsg = AnimationHandToPileComplete card
+                }
+
+        AnimationHandToPileStep2 floatingCard ->
+            onAnimationStep2
+                { model = model
+                , floatingCard = floatingCard
+                , delayInMs = 800
+                , onComplete = AnimationHandToPileComplete floatingCard.card
+                }
+
+        AnimationHandToPileComplete card ->
+            ( playCardOntoPile card model
+                |> checkIfGameOver
+                |> checkIfPlayedWildCard card
+                |> checkIfDeckIsEmpty
+                |> checkIfDraw2OrDraw4 card
+                |> moveOnToNextPlayer (Just card)
+                |> removeFloatingCard
+            , Cmd.none
+            )
+
+
+onAnimationStep1 :
     { result : Result Browser.Dom.Error value
     , model : Model
     , toFloatingCard : value -> FloatingCard
     , onFailureMsg : Msg
     }
     -> ( Model, Cmd Msg )
-onAnimationStart ({ model } as options) =
+onAnimationStep1 ({ model } as options) =
     case options.result of
         Ok value ->
             let
@@ -311,7 +311,7 @@ onAnimationStart ({ model } as options) =
             ( { model | floatingCardState = FloatingCardAtSource floatingCard }
             , sendMessageAfterDelay
                 { delayInMs = 100
-                , msg = AnimationDeckToPlayerHandStep2 floatingCard
+                , msg = AnimationDeckToHandStep2 floatingCard
                 }
             )
 
@@ -321,14 +321,14 @@ onAnimationStart ({ model } as options) =
             )
 
 
-animateFloatingCard :
+onAnimationStep2 :
     { floatingCard : FloatingCard
     , delayInMs : Int
     , onComplete : Msg
     , model : Model
     }
     -> ( Model, Cmd Msg )
-animateFloatingCard ({ model } as options) =
+onAnimationStep2 ({ model } as options) =
     ( { model | floatingCardState = FloatingCardAtDestination options.floatingCard }
     , sendMessageAfterDelay
         { delayInMs = options.delayInMs
@@ -344,11 +344,11 @@ dealCardToPlayer model =
             getBoundsOfLastCardInPlayerHandAndDeck
                 { lastCardInPlayersHand = lastCardInPlayersHand
                 , topCardInDeck = topCardInDeck
-                , onComplete = AnimationDeckToPlayerHandStep1
+                , onComplete = AnimationDeckToHandStep1
                 }
 
         _ ->
-            sendMessage AnimationDeckToPlayerHandComplete
+            sendMessage AnimationDeckToHandComplete
 
 
 removeFloatingCard : Model -> Model
