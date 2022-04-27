@@ -2,9 +2,9 @@ module Deck exposing
     ( Deck, new
     , draw
     , isEmpty, size
+    , topCard, topCards
     , reshuffle
     , view
-    , topCard
     )
 
 {-|
@@ -12,6 +12,7 @@ module Deck exposing
 @docs Deck, new
 @docs deal, draw
 @docs isEmpty, size
+@docs topCard, topCards
 @docs reshuffle
 @docs view
 
@@ -49,6 +50,11 @@ size (Deck { cards }) =
 topCard : Deck -> Maybe Card
 topCard (Deck { cards }) =
     List.head cards
+
+
+topCards : Int -> Deck -> List Card
+topCards count (Deck { cards }) =
+    List.take count cards
 
 
 reshuffle : Random.Seed -> List Card -> Deck

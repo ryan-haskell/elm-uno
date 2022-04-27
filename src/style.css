@@ -280,5 +280,34 @@ button {
 
 .floating-card {
   position: fixed;
-  transition: top 500ms ease-out, left 500ms ease-out, width 500ms ease-out, height 500ms ease-out;
+  transition: top 400ms ease-out, left 400ms ease-out, width 400ms ease-out, height 400ms ease-out;
+}
+
+.floating-card__copy {
+  position: absolute;
+  width: 100%;
+}
+
+.sick-alert {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(315deg) scale(0);
+
+  background: #555;
+  padding: 3rem;
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 3rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  box-shadow: 0 0 3rem rgb(100 255 195 / 75%);
+  transition: transform 300ms ease-in;
+
+  transform-origin: center;
+  border-radius: 1rem;
+  border: solid 3px white;
+}
+
+.sick-alert--visible {
+  transform: translate(-50%, -50%) rotate(-15deg) scale(1);
 }

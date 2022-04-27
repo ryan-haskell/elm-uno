@@ -1,4 +1,4 @@
-module Main exposing (Model, checkIfDraw2OrDraw4, init, main)
+module Main exposing (Model, init, main)
 
 import Browser
 import Browser.Dom
@@ -9,6 +9,7 @@ import Hand exposing (Hand)
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
+import NonEmptyList exposing (NonEmptyList)
 import Pile exposing (Pile)
 import Platform exposing (Task)
 import Process
@@ -48,7 +49,13 @@ type alias Model =
     , declaredColor : Maybe Card.Color
     , floatingCardState : FloatingCardState
     , seed : Int
+    , alert : Maybe Alert
     }
+
+
+type Alert
+    = SkipAlert
+    | ReverseAlert
 
 
 type FloatingCardState
@@ -58,7 +65,7 @@ type FloatingCardState
 
 
 type alias FloatingCard =
-    { card : Card
+    { cards : NonEmptyList Card
     , source : BoundingRect
     , destination : BoundingRect
     , shouldHide : Bool
@@ -108,6 +115,7 @@ init flags =
       , declaredColor = Nothing
       , floatingCardState = NoFloatingCard
       , seed = flags.seed
+      , alert = Nothing
       }
     , Cmd.none
     )
@@ -138,6 +146,19 @@ type Msg
     | AnimationComputerDeckToHandStep1 ComputerAction CardAndDeckPayload
     | AnimationComputerDeckToHandStep2 ComputerAction FloatingCard
     | AnimationComputerComplete ComputerAction
+      -- Draw 2 / Draw 4 animation
+    | DrawAnimationStart DrawAnimationPayload
+    | DrawAnimationStep1 DrawAnimationPayload CardAndDeckPayload
+    | DrawAnimationStep2 DrawAnimationPayload FloatingCard
+    | DrawAnimationComplete DrawAnimationPayload
+      -- Sick alerts
+    | SubscriptionDismissedAlert
+
+
+type alias DrawAnimationPayload =
+    { model : Model
+    , drawAction : DrawCardAction
+    }
 
 
 type alias CardAndPilePayload =
@@ -152,7 +173,7 @@ type alias CardAndPilePayload =
 
 
 type alias CardAndDeckPayload =
-    { card : Card
+    { cardsFromDeck : NonEmptyList Card
     , result :
         Result
             Browser.Dom.Error
@@ -241,9 +262,7 @@ update msg model =
                     in
                     case action of
                         ComputerCannotTakeAction ->
-                            ( performComputerAction action model
-                            , Cmd.none
-                            )
+                            performComputerAction action model
 
                         ComputerPlaysCard card ->
                             ( model
@@ -259,7 +278,7 @@ update msg model =
                                     ( model
                                     , getBoundsOfLastCardInHandAndDeck
                                         { lastCardInHand = lastCardInHand
-                                        , topCardInDeck = topCardInDeck
+                                        , cardsFromDeck = NonEmptyList.new topCardInDeck []
                                         , onComplete = AnimationComputerDeckToHandStep1 action
                                         }
                                     )
@@ -279,7 +298,7 @@ update msg model =
                 , result = result
                 , toFloatingCard =
                     \{ cardElement, pileElement } ->
-                        { card = card
+                        { cards = NonEmptyList.new card []
                         , shouldHide = False
                         , source = cardElement
                         , destination = pileElement
@@ -296,13 +315,13 @@ update msg model =
                 , onComplete = AnimationComputerComplete action
                 }
 
-        AnimationComputerDeckToHandStep1 action { card, result } ->
+        AnimationComputerDeckToHandStep1 action { cardsFromDeck, result } ->
             onAnimationStep1
                 { model = model
                 , result = result
                 , toFloatingCard =
                     \{ cardElement, deckElement } ->
-                        { card = card
+                        { cards = cardsFromDeck
                         , shouldHide = True
                         , source = deckElement
                         , destination = cardElement
@@ -320,20 +339,15 @@ update msg model =
                 }
 
         AnimationComputerComplete action ->
-            ( performComputerAction action model
-                |> checkIfGameOver
-                |> checkIfDeckIsEmpty
-                |> removeFloatingCard
-            , Cmd.none
-            )
+            performComputerAction action model
 
-        AnimationPlayerDeckToHandStep1 { card, result } ->
+        AnimationPlayerDeckToHandStep1 { cardsFromDeck, result } ->
             onAnimationStep1
                 { model = model
                 , result = result
                 , toFloatingCard =
                     \{ cardElement, deckElement } ->
-                        { card = card
+                        { cards = cardsFromDeck
                         , shouldHide = False
                         , source = deckElement
                         , destination = cardElement
@@ -364,7 +378,7 @@ update msg model =
                 , result = result
                 , toFloatingCard =
                     \{ cardElement, pileElement } ->
-                        { card = card
+                        { cards = NonEmptyList.new card []
                         , shouldHide = False
                         , source = cardElement
                         , destination = pileElement
@@ -378,19 +392,117 @@ update msg model =
                 { model = model
                 , floatingCard = floatingCard
                 , delayInMs = 800
-                , onComplete = AnimationPlayerHandToPileComplete floatingCard.card
+                , onComplete = AnimationPlayerHandToPileComplete (NonEmptyList.head floatingCard.cards)
                 }
 
         AnimationPlayerHandToPileComplete card ->
-            ( playCardOntoPile card model
-                |> checkIfGameOver
-                |> checkIfPlayedWildCard card
-                |> checkIfDeckIsEmpty
-                |> checkIfDraw2OrDraw4 card
-                |> moveOnToNextPlayer (Just card)
+            let
+                updatedModel : Model
+                updatedModel =
+                    playCardOntoPile card model
+                        |> checkIfGameOver
+                        |> checkIfPlayedWildCard card
+                        |> checkIfDeckIsEmpty
+                        |> moveOnToNextPlayer (Just card)
+                        |> removeFloatingCard
+                        |> checkForAlert card
+            in
+            case toMaybeDrawAction card of
+                Just drawAction ->
+                    ( model
+                    , startDrawAnimation
+                        { model = updatedModel
+                        , drawAction = drawAction
+                        }
+                    )
+
+                Nothing ->
+                    ( updatedModel, Cmd.none )
+
+        DrawAnimationStart payload ->
+            let
+                nextPlayerId : PlayerId
+                nextPlayerId =
+                    getNextPlayerId
+                        { distance = 1
+                        , direction = model.direction
+                        , total = getTotalPlayers model
+                        , currentPlayerId = model.currentPlayerId
+                        }
+
+                nextPlayersHand : Hand
+                nextPlayersHand =
+                    case nextPlayerId of
+                        0 ->
+                            model.playersHand
+
+                        computerId ->
+                            Dict.get computerId model.computerHands
+                                |> Maybe.withDefault Hand.empty
+
+                topCardsToDraw : List Card
+                topCardsToDraw =
+                    case payload.drawAction of
+                        DrawTwoPlayed ->
+                            Deck.topCards 2 model.deck
+
+                        DrawFourPlayed ->
+                            Deck.topCards 4 model.deck
+            in
+            case ( Hand.lastCard nextPlayersHand, NonEmptyList.fromList topCardsToDraw ) of
+                ( Just lastCardInHand, Just cardsFromDeck ) ->
+                    ( model
+                    , getBoundsOfLastCardInHandAndDeck
+                        { lastCardInHand = lastCardInHand
+                        , cardsFromDeck = cardsFromDeck
+                        , onComplete = DrawAnimationStep1 payload
+                        }
+                    )
+
+                _ ->
+                    ( model
+                    , sendMessage (DrawAnimationComplete payload)
+                    )
+
+        DrawAnimationStep1 payload { cardsFromDeck, result } ->
+            onAnimationStep1
+                { model = model
+                , result = result
+                , toFloatingCard =
+                    \{ cardElement, deckElement } ->
+                        { cards = cardsFromDeck
+                        , shouldHide = True
+                        , source = deckElement
+                        , destination = cardElement
+                        }
+                , onSuccessMsg = DrawAnimationStep2 payload
+                , onFailureMsg = DrawAnimationComplete payload
+                }
+
+        DrawAnimationStep2 payload floatingCard ->
+            onAnimationStep2
+                { model = model
+                , floatingCard = floatingCard
+                , delayInMs = 600
+                , onComplete = DrawAnimationComplete payload
+                }
+
+        DrawAnimationComplete payload ->
+            ( payload.model
+                |> performDrawCardAction payload.drawAction
                 |> removeFloatingCard
             , Cmd.none
             )
+
+        SubscriptionDismissedAlert ->
+            ( { model | alert = Nothing }
+            , Cmd.none
+            )
+
+
+startDrawAnimation : DrawAnimationPayload -> Cmd Msg
+startDrawAnimation payload =
+    sendMessage (DrawAnimationStart payload)
 
 
 onAnimationStep1 :
@@ -443,7 +555,7 @@ dealCardToPlayer model =
         ( Just lastCardInHand, Just topCardInDeck ) ->
             getBoundsOfLastCardInHandAndDeck
                 { lastCardInHand = lastCardInHand
-                , topCardInDeck = topCardInDeck
+                , cardsFromDeck = NonEmptyList.new topCardInDeck []
                 , onComplete = AnimationPlayerDeckToHandStep1
                 }
 
@@ -472,10 +584,10 @@ sendMessageAfterDelay options =
 
 
 getBoundsOfLastCardInHandAndDeck :
-    { topCardInDeck : Card
+    { cardsFromDeck : NonEmptyList Card
     , lastCardInHand : Card
     , onComplete :
-        { card : Card
+        { cardsFromDeck : NonEmptyList Card
         , result :
             Result
                 Browser.Dom.Error
@@ -486,7 +598,7 @@ getBoundsOfLastCardInHandAndDeck :
         -> msg
     }
     -> Cmd msg
-getBoundsOfLastCardInHandAndDeck { topCardInDeck, lastCardInHand, onComplete } =
+getBoundsOfLastCardInHandAndDeck { cardsFromDeck, lastCardInHand, onComplete } =
     let
         cardId : Card.Id
         cardId =
@@ -512,7 +624,7 @@ getBoundsOfLastCardInHandAndDeck { topCardInDeck, lastCardInHand, onComplete } =
         |> Task.attempt
             (\result ->
                 onComplete
-                    { card = topCardInDeck
+                    { cardsFromDeck = cardsFromDeck
                     , result = result
                     }
             )
@@ -576,11 +688,18 @@ isComputersTurn model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if isComputersTurn model then
-        Time.every 1500 (\_ -> ComputerTakesTurn)
+    Sub.batch
+        [ if isComputersTurn model then
+            Time.every 1800 (\_ -> ComputerTakesTurn)
 
-    else
-        Sub.none
+          else
+            Sub.none
+        , if model.alert /= Nothing then
+            Time.every 800 (\_ -> SubscriptionDismissedAlert)
+
+          else
+            Sub.none
+        ]
 
 
 startNewGame : Model -> Model
@@ -814,11 +933,11 @@ type ComputerAction
     | ComputerCannotTakeAction
 
 
-performComputerAction : ComputerAction -> Model -> Model
+performComputerAction : ComputerAction -> Model -> ( Model, Cmd Msg )
 performComputerAction computerAction model =
     case computerAction of
         ComputerCannotTakeAction ->
-            model
+            ( model, Cmd.none )
 
         ComputerPlaysCard card ->
             let
@@ -853,34 +972,74 @@ performComputerAction computerAction model =
 
                     else
                         Nothing
+
+                updatedModel : Model
+                updatedModel =
+                    { model
+                        | seed = model.seed + 1
+                        , computerHands = computerHandsWithoutCard
+                        , pile =
+                            model.pile
+                                |> Pile.addCardToTop card
+                        , declaredColor =
+                            computerDeclaredWild remainingColorsInHand
+                    }
+                        |> moveOnToNextPlayer (Just card)
+                        |> checkIfGameOver
+                        |> checkIfDeckIsEmpty
+                        |> removeFloatingCard
+                        |> checkForAlert card
             in
-            { model
-                | seed = model.seed + 1
-                , computerHands = computerHandsWithoutCard
-                , pile =
-                    model.pile
-                        |> Pile.addCardToTop card
-                , declaredColor =
-                    computerDeclaredWild remainingColorsInHand
-            }
-                |> checkIfDraw2OrDraw4 card
-                |> moveOnToNextPlayer (Just card)
+            case toMaybeDrawAction card of
+                Just drawAction ->
+                    ( model
+                    , startDrawAnimation
+                        { model = updatedModel
+                        , drawAction = drawAction
+                        }
+                    )
+
+                Nothing ->
+                    ( updatedModel
+                    , Cmd.none
+                    )
 
         ComputerDrawsFromDeck _ ->
             let
                 afterComputerDraws : { cards : List Card, deck : Deck }
                 afterComputerDraws =
                     Deck.draw 1 model.deck
+
+                updatedModel : Model
+                updatedModel =
+                    { model
+                        | seed = model.seed + 1
+                        , computerHands =
+                            addCardsToComputersHand model.currentPlayerId
+                                afterComputerDraws.cards
+                                model.computerHands
+                        , deck = afterComputerDraws.deck
+                    }
+                        |> moveOnToNextPlayer Nothing
+                        |> checkIfGameOver
+                        |> checkIfDeckIsEmpty
+                        |> removeFloatingCard
             in
-            { model
-                | seed = model.seed + 1
-                , computerHands =
-                    addCardsToComputersHand model.currentPlayerId
-                        afterComputerDraws.cards
-                        model.computerHands
-                , deck = afterComputerDraws.deck
-            }
-                |> moveOnToNextPlayer Nothing
+            ( updatedModel
+            , Cmd.none
+            )
+
+
+checkForAlert : Card -> Model -> Model
+checkForAlert card model =
+    if Card.isSkip card then
+        { model | alert = Just SkipAlert }
+
+    else if Card.isReverse card then
+        { model | alert = Just ReverseAlert }
+
+    else
+        { model | alert = Nothing }
 
 
 removeCardFromComputersHand : PlayerId -> Card -> Dict PlayerId Hand -> Dict PlayerId Hand
@@ -911,15 +1070,32 @@ addCardsToComputersHand id newCards computerHands =
         computerHands
 
 
-checkIfDraw2OrDraw4 : Card -> Model -> Model
-checkIfDraw2OrDraw4 card model =
+toMaybeDrawAction : Card -> Maybe DrawCardAction
+toMaybeDrawAction card =
+    if Card.isDrawTwo card then
+        Just DrawTwoPlayed
+
+    else if Card.isWildDraw4 card then
+        Just DrawFourPlayed
+
+    else
+        Nothing
+
+
+type DrawCardAction
+    = DrawTwoPlayed
+    | DrawFourPlayed
+
+
+performDrawCardAction : DrawCardAction -> Model -> Model
+performDrawCardAction action model =
     let
-        nextPlayerId : PlayerId
-        nextPlayerId =
+        skippedPlayerId : PlayerId
+        skippedPlayerId =
             getNextPlayerId
                 { total = getTotalPlayers model
                 , distance = 1
-                , direction = model.direction
+                , direction = reverseDirection model.direction
                 , currentPlayerId = model.currentPlayerId
                 }
 
@@ -930,7 +1106,7 @@ checkIfDraw2OrDraw4 card model =
                 afterDrawing =
                     Deck.draw amount model.deck
             in
-            case nextPlayerId of
+            case skippedPlayerId of
                 0 ->
                     { model
                         | playersHand =
@@ -948,14 +1124,12 @@ checkIfDraw2OrDraw4 card model =
                         , deck = afterDrawing.deck
                     }
     in
-    if Card.isDrawTwo card then
-        giveCards 2
+    case action of
+        DrawTwoPlayed ->
+            giveCards 2
 
-    else if Card.isWildDraw4 card then
-        giveCards 4
-
-    else
-        model
+        DrawFourPlayed ->
+            giveCards 4
 
 
 getTotalPlayers : Model -> Int
@@ -1109,6 +1283,7 @@ view model =
         , viewPlayerHand model
         , viewFloatingCard model
         , viewDialog model
+        , viewSickAlert model
         ]
 
 
@@ -1178,11 +1353,11 @@ toMaybeFloatingCard floatingCardState =
         NoFloatingCard ->
             Nothing
 
-        FloatingCardAtSource { card } ->
-            Just card
+        FloatingCardAtSource { cards } ->
+            Just (NonEmptyList.head cards)
 
-        FloatingCardAtDestination { card } ->
-            Just card
+        FloatingCardAtDestination { cards } ->
+            Just (NonEmptyList.head cards)
 
 
 viewPlayerHand : Model -> Html Msg
@@ -1276,8 +1451,37 @@ viewDialogWithContent content =
 viewFloatingCard : Model -> Html msg
 viewFloatingCard model =
     let
-        viewCardAtRectangle : Card -> Bool -> BoundingRect -> Html msg
-        viewCardAtRectangle card shouldHide rect =
+        viewCardAtRectangle : ( Card, List Card ) -> Bool -> BoundingRect -> Html msg
+        viewCardAtRectangle ( first, otherCards ) shouldHide rect =
+            let
+                viewSingleCard : Card -> Html msg
+                viewSingleCard card =
+                    if shouldHide then
+                        Card.viewBackOfCard card
+
+                    else
+                        Card.view card
+
+                offset : Int
+                offset =
+                    10
+
+                viewOffsetCards : List (Html msg)
+                viewOffsetCards =
+                    [ viewSingleCard first
+                    , List.indexedMap viewOffsetCard otherCards
+                        |> Html.div []
+                    ]
+
+                viewOffsetCard : Int -> Card -> Html msg
+                viewOffsetCard i card =
+                    Html.div
+                        [ Html.Attributes.class "floating-card__copy"
+                        , Html.Attributes.style "top" (pct (offset * (1 + i)))
+                        , Html.Attributes.style "left" (pct (offset * (1 + i)))
+                        ]
+                        [ viewSingleCard card ]
+            in
             Html.div
                 [ Html.Attributes.class "floating-card"
                 , Html.Attributes.style "top" (px rect.y)
@@ -1285,24 +1489,55 @@ viewFloatingCard model =
                 , Html.Attributes.style "width" (px rect.width)
                 , Html.Attributes.style "height" (px rect.height)
                 ]
-                [ if shouldHide then
-                    Card.viewBackOfCard card
-
-                  else
-                    Card.view card
-                ]
+                viewOffsetCards
     in
     case model.floatingCardState of
         NoFloatingCard ->
             Html.text ""
 
-        FloatingCardAtSource { card, shouldHide, source } ->
-            viewCardAtRectangle card shouldHide source
+        FloatingCardAtSource { cards, shouldHide, source } ->
+            viewCardAtRectangle cards shouldHide source
 
-        FloatingCardAtDestination { card, shouldHide, destination } ->
-            viewCardAtRectangle card shouldHide destination
+        FloatingCardAtDestination { cards, shouldHide, destination } ->
+            viewCardAtRectangle cards shouldHide destination
 
 
 px : Float -> String
 px float =
     String.fromFloat float ++ "px"
+
+
+pct : Int -> String
+pct int =
+    String.fromInt int ++ "%"
+
+
+viewSickAlert : Model -> Html Msg
+viewSickAlert model =
+    Html.div [ Html.Attributes.style "pointer-events" "none" ]
+        [ viewAlert
+            { isVisible = model.alert == Just SkipAlert
+            , message = "Skip!"
+            }
+        , viewAlert
+            { isVisible = model.alert == Just ReverseAlert
+            , message = "Reverse!"
+            }
+        ]
+
+
+viewAlert : { isVisible : Bool, message : String } -> Html Msg
+viewAlert { isVisible, message } =
+    Html.div
+        [ Html.Attributes.class "sick-alert"
+        , Html.Attributes.classList
+            [ ( "sick-alert--visible"
+              , isVisible
+              )
+            ]
+        ]
+        [ Html.div
+            [ Html.Attributes.class "sick-alert__message"
+            ]
+            [ Html.text message ]
+        ]
