@@ -2,7 +2,7 @@ module Hand exposing
     ( Hand, empty, fromListOfCards
     , addCards, removeCard
     , isEmpty, size
-    , findPlayableCards
+    , findPlayableCards, lastCard
     , getAvailableColors
     , Side(..), view
     )
@@ -12,7 +12,7 @@ module Hand exposing
 @docs Hand, empty, fromListOfCards
 @docs addCards, removeCard
 @docs isEmpty, size
-@docs findPlayableCards
+@docs findPlayableCards, lastCard
 @docs getAvailableColors
 @docs Side, view
 
@@ -57,6 +57,13 @@ removeCard cardToRemove (Hand cards) =
 size : Hand -> Int
 size (Hand cards) =
     List.length cards
+
+
+lastCard : Hand -> Maybe Card
+lastCard (Hand cards) =
+    cards
+        |> List.reverse
+        |> List.head
 
 
 isEmpty : Hand -> Bool

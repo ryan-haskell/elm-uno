@@ -4,6 +4,7 @@ module Deck exposing
     , isEmpty, size
     , reshuffle
     , view
+    , topCard
     )
 
 {-|
@@ -45,6 +46,11 @@ size (Deck { cards }) =
     List.length cards
 
 
+topCard : Deck -> Maybe Card
+topCard (Deck { cards }) =
+    List.head cards
+
+
 reshuffle : Random.Seed -> List Card -> Deck
 reshuffle seed cards =
     Deck
@@ -77,10 +83,10 @@ view options =
     in
     Html.div [ Html.Attributes.class "deck", Html.Attributes.id "deck" ]
         [ case List.head cards of
-            Just topCard ->
+            Just topCard_ ->
                 Html.button
                     [ Html.Events.onClick options.onClick ]
-                    [ Card.viewBackOfCard topCard ]
+                    [ Card.viewBackOfCard topCard_ ]
 
             Nothing ->
                 Card.viewEmptyDeck

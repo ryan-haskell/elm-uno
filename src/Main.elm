@@ -46,7 +46,7 @@ type alias Model =
     , playersHand : Hand
     , computerHands : Dict PlayerId Hand
     , declaredColor : Maybe Card.Color
-    , floatingCard : FloatingCardState
+    , floatingCardState : FloatingCardState
     , seed : Int
     }
 
@@ -105,7 +105,7 @@ init flags =
                 , ( 3, Hand.empty )
                 ]
       , declaredColor = Nothing
-      , floatingCard = NoFloatingCard
+      , floatingCardState = NoFloatingCard
       , seed = flags.seed
       }
     , Cmd.none
@@ -122,6 +122,7 @@ type Msg
     | PlayerClickedPlayAgain
     | PlayerDeclaredColor Card.Color
     | ComputerTakesTurn
+      -- Player hand to pile animation
     | AnimationHandToPileStep1
         { card : Card
         , result :
@@ -132,7 +133,19 @@ type Msg
                 }
         }
     | AnimationHandToPileStep2 FloatingCard
-    | AnimationHandToPileStep3 Card
+    | AnimationHandToPileComplete Card
+      -- Deck to hand animation
+    | AnimationDeckToPlayerHandStep1
+        { card : Card
+        , result :
+            Result
+                Browser.Dom.Error
+                { cardElement : BoundingRect
+                , deckElement : BoundingRect
+                }
+        }
+    | AnimationDeckToPlayerHandStep2 FloatingCard
+    | AnimationDeckToPlayerHandComplete
 
 
 type alias BoundingRect =
@@ -153,10 +166,8 @@ update msg model =
 
                 PlayingGame ->
                     if isHumanPlayersTurn model then
-                        ( drawAnotherCardIntoHand model
-                            |> checkIfDeckIsEmpty
-                            |> moveOnToNextPlayer Nothing
-                        , Cmd.none
+                        ( model
+                        , dealCardToPlayer model
                         )
 
                     else
@@ -167,6 +178,35 @@ update msg model =
 
                 PlayerWonTheGame _ ->
                     ( model, Cmd.none )
+
+        AnimationDeckToPlayerHandStep1 { card, result } ->
+            onAnimationStart
+                { result = result
+                , model = model
+                , toFloatingCard =
+                    \{ cardElement, deckElement } ->
+                        { card = card
+                        , source = deckElement
+                        , destination = cardElement
+                        }
+                , onFailureMsg = AnimationDeckToPlayerHandComplete
+                }
+
+        AnimationDeckToPlayerHandStep2 floatingCard ->
+            animateFloatingCard
+                { model = model
+                , floatingCard = floatingCard
+                , delayInMs = 500
+                , onComplete = AnimationDeckToPlayerHandComplete
+                }
+
+        AnimationDeckToPlayerHandComplete ->
+            ( drawAnotherCardIntoHand model
+                |> checkIfDeckIsEmpty
+                |> moveOnToNextPlayer Nothing
+                |> removeFloatingCard
+            , Cmd.none
+            )
 
         PlayerClickedCardInHand card ->
             case Pile.topCard model.pile of
@@ -193,40 +233,27 @@ update msg model =
                         ( model, Cmd.none )
 
         AnimationHandToPileStep1 { card, result } ->
-            case result of
-                Ok { cardElement, pileElement } ->
-                    let
-                        floatingCard : FloatingCard
-                        floatingCard =
-                            { card = card
-                            , source = cardElement
-                            , destination = pileElement
-                            }
-                    in
-                    ( { model | floatingCard = FloatingCardAtSource floatingCard }
-                    , delayMessage
-                        { delayInMs = 100
-                        , msg = AnimationHandToPileStep2 floatingCard
+            onAnimationStart
+                { model = model
+                , result = result
+                , toFloatingCard =
+                    \{ cardElement, pileElement } ->
+                        { card = card
+                        , source = cardElement
+                        , destination = pileElement
                         }
-                    )
-
-                Err _ ->
-                    ( model
-                    , delayMessage
-                        { delayInMs = 0
-                        , msg = AnimationHandToPileStep3 card
-                        }
-                    )
+                , onFailureMsg = AnimationHandToPileComplete card
+                }
 
         AnimationHandToPileStep2 floatingCard ->
-            ( { model | floatingCard = FloatingCardAtDestination floatingCard }
-            , delayMessage
-                { delayInMs = 800
-                , msg = AnimationHandToPileStep3 floatingCard.card
+            animateFloatingCard
+                { model = model
+                , floatingCard = floatingCard
+                , delayInMs = 800
+                , onComplete = AnimationHandToPileComplete floatingCard.card
                 }
-            )
 
-        AnimationHandToPileStep3 card ->
+        AnimationHandToPileComplete card ->
             ( playCardOntoPile card model
                 |> checkIfGameOver
                 |> checkIfPlayedWildCard card
@@ -267,16 +294,128 @@ update msg model =
                     ( model, Cmd.none )
 
 
+onAnimationStart :
+    { result : Result Browser.Dom.Error value
+    , model : Model
+    , toFloatingCard : value -> FloatingCard
+    , onFailureMsg : Msg
+    }
+    -> ( Model, Cmd Msg )
+onAnimationStart ({ model } as options) =
+    case options.result of
+        Ok value ->
+            let
+                floatingCard =
+                    options.toFloatingCard value
+            in
+            ( { model | floatingCardState = FloatingCardAtSource floatingCard }
+            , sendMessageAfterDelay
+                { delayInMs = 100
+                , msg = AnimationDeckToPlayerHandStep2 floatingCard
+                }
+            )
+
+        Err _ ->
+            ( options.model
+            , sendMessage options.onFailureMsg
+            )
+
+
+animateFloatingCard :
+    { floatingCard : FloatingCard
+    , delayInMs : Int
+    , onComplete : Msg
+    , model : Model
+    }
+    -> ( Model, Cmd Msg )
+animateFloatingCard ({ model } as options) =
+    ( { model | floatingCardState = FloatingCardAtDestination options.floatingCard }
+    , sendMessageAfterDelay
+        { delayInMs = options.delayInMs
+        , msg = options.onComplete
+        }
+    )
+
+
+dealCardToPlayer : Model -> Cmd Msg
+dealCardToPlayer model =
+    case ( Hand.lastCard model.playersHand, Deck.topCard model.deck ) of
+        ( Just lastCardInPlayersHand, Just topCardInDeck ) ->
+            getBoundsOfLastCardInPlayerHandAndDeck
+                { lastCardInPlayersHand = lastCardInPlayersHand
+                , topCardInDeck = topCardInDeck
+                , onComplete = AnimationDeckToPlayerHandStep1
+                }
+
+        _ ->
+            sendMessage AnimationDeckToPlayerHandComplete
+
+
 removeFloatingCard : Model -> Model
 removeFloatingCard model =
-    { model | floatingCard = NoFloatingCard }
+    { model | floatingCardState = NoFloatingCard }
 
 
-delayMessage : { delayInMs : Int, msg : msg } -> Cmd msg
-delayMessage options =
+sendMessage : msg -> Cmd msg
+sendMessage msg =
+    sendMessageAfterDelay
+        { delayInMs = 0
+        , msg = msg
+        }
+
+
+sendMessageAfterDelay : { delayInMs : Int, msg : msg } -> Cmd msg
+sendMessageAfterDelay options =
     Process.sleep (toFloat options.delayInMs)
         |> Task.map (\_ -> options.msg)
         |> Task.perform (\msg -> msg)
+
+
+getBoundsOfLastCardInPlayerHandAndDeck :
+    { topCardInDeck : Card
+    , lastCardInPlayersHand : Card
+    , onComplete :
+        { card : Card
+        , result :
+            Result
+                Browser.Dom.Error
+                { cardElement : BoundingRect
+                , deckElement : BoundingRect
+                }
+        }
+        -> msg
+    }
+    -> Cmd msg
+getBoundsOfLastCardInPlayerHandAndDeck { topCardInDeck, lastCardInPlayersHand, onComplete } =
+    let
+        cardId : Card.Id
+        cardId =
+            Card.toUniqueId lastCardInPlayersHand
+
+        task :
+            Task
+                Browser.Dom.Error
+                { cardElement : BoundingRect
+                , deckElement : BoundingRect
+                }
+        task =
+            Task.map2
+                (\card_ deck_ ->
+                    { cardElement = card_.element
+                    , deckElement = deck_.element
+                    }
+                )
+                (Browser.Dom.getElement cardId)
+                (Browser.Dom.getElement "deck")
+    in
+    task
+        |> Task.attempt
+            (\result ->
+                onComplete
+                    { card = topCardInDeck
+                    , result = result
+                    }
+            )
 
 
 getBoundsOfCardAndPile :
@@ -505,11 +644,6 @@ playCardOntoPile card model =
             model.pile
                 |> Pile.addCardToTop card
     }
-
-
-doesNotHaveMatchingId : Card -> Card -> Bool
-doesNotHaveMatchingId card1 card2 =
-    Card.toUniqueId card1 /= Card.toUniqueId card2
 
 
 haveComputerTakeTurn : Model -> Model
@@ -891,7 +1025,7 @@ viewComputerHands model =
             case Dict.get id model.computerHands of
                 Just hand ->
                     Hand.view
-                        { cardToHide = toMaybeFloatingCard model.floatingCard
+                        { cardToHide = toMaybeFloatingCard model.floatingCardState
                         , side = side
                         , hand = hand
                         , isCurrentlyPlaying = id == model.currentPlayerId
@@ -925,7 +1059,7 @@ toMaybeFloatingCard floatingCardState =
 viewPlayerHand : Model -> Html Msg
 viewPlayerHand model =
     Hand.view
-        { cardToHide = toMaybeFloatingCard model.floatingCard
+        { cardToHide = toMaybeFloatingCard model.floatingCardState
         , side = Hand.Bottom
         , hand = model.playersHand
         , isCurrentlyPlaying = 0 == model.currentPlayerId
@@ -1012,31 +1146,28 @@ viewDialogWithContent content =
 
 viewFloatingCard : Model -> Html msg
 viewFloatingCard model =
-    case model.floatingCard of
+    let
+        viewCardAtRectangle : Card -> BoundingRect -> Html msg
+        viewCardAtRectangle card rect =
+            Html.div
+                [ Html.Attributes.class "floating-card"
+                , Html.Attributes.style "top" (px rect.y)
+                , Html.Attributes.style "left" (px rect.x)
+                , Html.Attributes.style "width" (px rect.width)
+                , Html.Attributes.style "height" (px rect.height)
+                ]
+                [ Card.view card
+                ]
+    in
+    case model.floatingCardState of
         NoFloatingCard ->
             Html.text ""
 
         FloatingCardAtSource { card, source } ->
-            Html.div
-                [ Html.Attributes.class "floating-card"
-                , Html.Attributes.style "top" (px source.y)
-                , Html.Attributes.style "left" (px source.x)
-                , Html.Attributes.style "width" (px source.width)
-                , Html.Attributes.style "height" (px source.width)
-                ]
-                [ Card.view card
-                ]
+            viewCardAtRectangle card source
 
         FloatingCardAtDestination { card, destination } ->
-            Html.div
-                [ Html.Attributes.class "floating-card"
-                , Html.Attributes.style "top" (px destination.y)
-                , Html.Attributes.style "left" (px destination.x)
-                , Html.Attributes.style "width" (px destination.width)
-                , Html.Attributes.style "height" (px destination.width)
-                ]
-                [ Card.view card
-                ]
+            viewCardAtRectangle card destination
 
 
 px : Float -> String
