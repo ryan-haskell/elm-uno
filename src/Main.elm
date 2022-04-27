@@ -124,53 +124,42 @@ type Msg
     | PlayerDeclaredColor Card.Color
     | ComputerTakesTurn
       -- Player hand to pile animation
-    | AnimationPlayerHandToPileStep1
-        { card : Card
-        , result :
-            Result
-                Browser.Dom.Error
-                { cardElement : BoundingRect
-                , pileElement : BoundingRect
-                }
-        }
+    | AnimationPlayerHandToPileStep1 CardAndPilePayload
     | AnimationPlayerHandToPileStep2 FloatingCard
     | AnimationPlayerHandToPileComplete Card
+      -- Deck to player hand animation
+    | AnimationPlayerDeckToHandStep1 CardAndDeckPayload
+    | AnimationPlayerDeckToHandStep2 FloatingCard
+    | AnimationPlayerDeckToHandComplete
       -- Computer hand to pile animation
-    | AnimationComputerHandToPileStep1
-        ComputerAction
-        { card : Card
-        , result :
-            Result
-                Browser.Dom.Error
-                { cardElement : BoundingRect
-                , pileElement : BoundingRect
-                }
-        }
+    | AnimationComputerHandToPileStep1 ComputerAction CardAndPilePayload
     | AnimationComputerHandToPileStep2 ComputerAction FloatingCard
-    | AnimationDeckToComputerHandStep1
-        ComputerAction
-        { card : Card
-        , result :
-            Result
-                Browser.Dom.Error
-                { cardElement : BoundingRect
-                , deckElement : BoundingRect
-                }
-        }
-    | AnimationDeckToComputerHandStep2 ComputerAction FloatingCard
+      -- Deck to computer hand animation
+    | AnimationComputerDeckToHandStep1 ComputerAction CardAndDeckPayload
+    | AnimationComputerDeckToHandStep2 ComputerAction FloatingCard
     | AnimationComputerComplete ComputerAction
-      -- Deck to hand animation
-    | AnimationDeckToPlayerHandStep1
-        { card : Card
-        , result :
-            Result
-                Browser.Dom.Error
-                { cardElement : BoundingRect
-                , deckElement : BoundingRect
-                }
-        }
-    | AnimationDeckToPlayerHandStep2 FloatingCard
-    | AnimationDeckToPlayerHandComplete
+
+
+type alias CardAndPilePayload =
+    { card : Card
+    , result :
+        Result
+            Browser.Dom.Error
+            { cardElement : BoundingRect
+            , pileElement : BoundingRect
+            }
+    }
+
+
+type alias CardAndDeckPayload =
+    { card : Card
+    , result :
+        Result
+            Browser.Dom.Error
+            { cardElement : BoundingRect
+            , deckElement : BoundingRect
+            }
+    }
 
 
 type alias BoundingRect =
@@ -271,7 +260,7 @@ update msg model =
                                     , getBoundsOfLastCardInHandAndDeck
                                         { lastCardInHand = lastCardInHand
                                         , topCardInDeck = topCardInDeck
-                                        , onComplete = AnimationDeckToComputerHandStep1 action
+                                        , onComplete = AnimationComputerDeckToHandStep1 action
                                         }
                                     )
 
@@ -307,7 +296,7 @@ update msg model =
                 , onComplete = AnimationComputerComplete action
                 }
 
-        AnimationDeckToComputerHandStep1 action { card, result } ->
+        AnimationComputerDeckToHandStep1 action { card, result } ->
             onAnimationStep1
                 { model = model
                 , result = result
@@ -318,11 +307,11 @@ update msg model =
                         , source = deckElement
                         , destination = cardElement
                         }
-                , onSuccessMsg = AnimationDeckToComputerHandStep2 action
+                , onSuccessMsg = AnimationComputerDeckToHandStep2 action
                 , onFailureMsg = AnimationComputerComplete action
                 }
 
-        AnimationDeckToComputerHandStep2 action floatingCard ->
+        AnimationComputerDeckToHandStep2 action floatingCard ->
             onAnimationStep2
                 { model = model
                 , floatingCard = floatingCard
@@ -338,7 +327,7 @@ update msg model =
             , Cmd.none
             )
 
-        AnimationDeckToPlayerHandStep1 { card, result } ->
+        AnimationPlayerDeckToHandStep1 { card, result } ->
             onAnimationStep1
                 { model = model
                 , result = result
@@ -349,19 +338,19 @@ update msg model =
                         , source = deckElement
                         , destination = cardElement
                         }
-                , onSuccessMsg = AnimationDeckToPlayerHandStep2
-                , onFailureMsg = AnimationDeckToPlayerHandComplete
+                , onSuccessMsg = AnimationPlayerDeckToHandStep2
+                , onFailureMsg = AnimationPlayerDeckToHandComplete
                 }
 
-        AnimationDeckToPlayerHandStep2 floatingCard ->
+        AnimationPlayerDeckToHandStep2 floatingCard ->
             onAnimationStep2
                 { model = model
                 , floatingCard = floatingCard
                 , delayInMs = 500
-                , onComplete = AnimationDeckToPlayerHandComplete
+                , onComplete = AnimationPlayerDeckToHandComplete
                 }
 
-        AnimationDeckToPlayerHandComplete ->
+        AnimationPlayerDeckToHandComplete ->
             ( drawAnotherCardIntoHand model
                 |> checkIfDeckIsEmpty
                 |> moveOnToNextPlayer Nothing
@@ -455,11 +444,11 @@ dealCardToPlayer model =
             getBoundsOfLastCardInHandAndDeck
                 { lastCardInHand = lastCardInHand
                 , topCardInDeck = topCardInDeck
-                , onComplete = AnimationDeckToPlayerHandStep1
+                , onComplete = AnimationPlayerDeckToHandStep1
                 }
 
         _ ->
-            sendMessage AnimationDeckToPlayerHandComplete
+            sendMessage AnimationPlayerDeckToHandComplete
 
 
 removeFloatingCard : Model -> Model
