@@ -868,10 +868,6 @@ drawAnotherCardIntoHand model =
 
 playCardOntoPile : Card -> Model -> Model
 playCardOntoPile card model =
-    let
-        _ =
-            Debug.log "HELLO" card
-    in
     { model
         | playersHand = Hand.removeCard card model.playersHand
         , pile =
