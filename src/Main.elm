@@ -2,6 +2,7 @@ module Main exposing (Model, init, main)
 
 import Browser
 import Browser.Dom
+import Browser.Events
 import Card exposing (Card)
 import Deck exposing (Deck)
 import Dict exposing (Dict)
@@ -28,7 +29,7 @@ main : Program Flags Model Msg
 main =
     Browser.element
         { init = init
-        , update = update
+        , update = detectTurnOrderChange update
         , view = view
         , subscriptions = subscriptions
         }
@@ -50,6 +51,10 @@ type alias Model =
     , floatingCardState : FloatingCardState
     , seed : Int
     , alert : Maybe Alert
+    , timeElapsedSinceLastTurn :
+        { playerId : PlayerId
+        , time : Float
+        }
     }
 
 
@@ -94,7 +99,7 @@ type alias PlayerId =
 type Phase
     = ReadyToPlay
     | PlayingGame
-    | DeclaringWildCardColor
+    | DeclaringWildCardColor Card
     | PlayerWonTheGame Int
 
 
@@ -116,6 +121,10 @@ init flags =
       , floatingCardState = NoFloatingCard
       , seed = flags.seed
       , alert = Nothing
+      , timeElapsedSinceLastTurn =
+            { playerId = 0
+            , time = 0
+            }
       }
     , Cmd.none
     )
@@ -129,7 +138,9 @@ type Msg
     = PlayerClickedDeck
     | PlayerClickedCardInHand Card
     | PlayerClickedPlayAgain
-    | PlayerDeclaredColor Card.Color
+    | PlayerDeclaredColor Card Card.Color
+      -- Animations
+    | DetectedChangeInTurn
     | ComputerTakesTurn
       -- Player hand to pile animation
     | AnimationPlayerHandToPileStep1 CardAndPilePayload
@@ -208,7 +219,7 @@ update msg model =
                     else
                         ( model, Cmd.none )
 
-                DeclaringWildCardColor ->
+                DeclaringWildCardColor _ ->
                     ( model, Cmd.none )
 
                 PlayerWonTheGame _ ->
@@ -238,11 +249,12 @@ update msg model =
                     else
                         ( model, Cmd.none )
 
-        PlayerDeclaredColor color ->
+        PlayerDeclaredColor playedWildCard color ->
             ( { model
                 | declaredColor = Just color
                 , phase = PlayingGame
               }
+                |> moveOnToNextPlayer (Just playedWildCard)
             , Cmd.none
             )
 
@@ -286,7 +298,7 @@ update msg model =
                                 _ ->
                                     ( model, Cmd.none )
 
-                DeclaringWildCardColor ->
+                DeclaringWildCardColor _ ->
                     ( model, Cmd.none )
 
                 PlayerWonTheGame _ ->
@@ -403,7 +415,6 @@ update msg model =
                         |> checkIfGameOver
                         |> checkIfPlayedWildCard card
                         |> checkIfDeckIsEmpty
-                        |> moveOnToNextPlayer (Just card)
                         |> removeFloatingCard
                         |> checkForAlert card
             in
@@ -496,6 +507,11 @@ update msg model =
 
         SubscriptionDismissedAlert ->
             ( { model | alert = Nothing }
+            , Cmd.none
+            )
+
+        DetectedChangeInTurn ->
+            ( model
             , Cmd.none
             )
 
@@ -689,12 +705,7 @@ isComputersTurn model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ if isComputersTurn model then
-            Time.every 1800 (\_ -> ComputerTakesTurn)
-
-          else
-            Sub.none
-        , if model.alert /= Nothing then
+        [ if model.alert /= Nothing then
             Time.every 800 (\_ -> SubscriptionDismissedAlert)
 
           else
@@ -1165,13 +1176,15 @@ checkIfPlayedWildCard card model =
     case model.phase of
         PlayingGame ->
             if Card.isOneOfTheWildCards card then
-                { model | phase = DeclaringWildCardColor }
+                { model | phase = DeclaringWildCardColor card }
 
             else
                 { model | declaredColor = Nothing }
+                    |> moveOnToNextPlayer (Just card)
 
         _ ->
             { model | declaredColor = Nothing }
+                |> moveOnToNextPlayer (Just card)
 
 
 checkIfDeckIsEmpty : Model -> Model
@@ -1375,8 +1388,8 @@ viewPlayerHand model =
 viewDialog : Model -> Html Msg
 viewDialog model =
     case model.phase of
-        DeclaringWildCardColor ->
-            viewDeclareColorDialog model
+        DeclaringWildCardColor card ->
+            viewDeclareColorDialog card
 
         PlayerWonTheGame 0 ->
             viewYouWonDialog model
@@ -1388,12 +1401,12 @@ viewDialog model =
             Html.text ""
 
 
-viewDeclareColorDialog : Model -> Html Msg
-viewDeclareColorDialog _ =
+viewDeclareColorDialog : Card -> Html Msg
+viewDeclareColorDialog card =
     let
         viewChooseColorButton color =
             Html.button
-                [ Html.Events.onClick (PlayerDeclaredColor color)
+                [ Html.Events.onClick (PlayerDeclaredColor card color)
                 , Html.Attributes.class "button"
                 ]
                 [ Html.text (Card.colorToName color) ]
@@ -1541,3 +1554,50 @@ viewAlert { isVisible, message } =
             ]
             [ Html.text message ]
         ]
+
+
+
+-- Time.every workaround
+
+
+{-| Was previously using `Time.every` to make the computers move every 1.5 seconds.
+This meant they were unaware if an animation was in progress, so sometimes it felt
+like the AI was moving quickly (after an animation) and other times it felt like
+they were moving slowly (when no animation occurred)
+
+The normal solution to this problem would be using something like
+`Browser.Events.onAnimationFrame` to have smoother animations, but I wanted to
+preserve your ability to use the Elm debugger, without logging a message on
+every tick.
+
+This meant detecting when any update changed the turn order to a computers turn,
+which only happens at the end of an animation.
+
+-}
+detectTurnOrderChange :
+    (Msg -> Model -> ( Model, Cmd Msg ))
+    -> Msg
+    -> Model
+    -> ( Model, Cmd Msg )
+detectTurnOrderChange originalUpdateFn msg model =
+    let
+        ( updatedModel, cmd ) =
+            originalUpdateFn msg model
+
+        turnOrderChanged : Bool
+        turnOrderChanged =
+            model.currentPlayerId /= updatedModel.currentPlayerId
+    in
+    if turnOrderChanged && isComputersTurn updatedModel then
+        ( updatedModel
+        , Cmd.batch
+            [ sendMessageAfterDelay
+                { delayInMs = 1000
+                , msg = ComputerTakesTurn
+                }
+            , cmd
+            ]
+        )
+
+    else
+        ( updatedModel, cmd )
