@@ -33,6 +33,7 @@ module Card exposing
 -}
 
 import Html exposing (Html)
+import Html.Attributes
 import Random
 import Random.List
 import Svg exposing (Svg)
@@ -215,33 +216,60 @@ toBasicInformation (Card card) =
 
 view : Card -> Html msg
 view (Card card) =
-    case card.kind of
+    Html.div
+        [ Html.Attributes.class "card__wrapper"
+        , Html.Attributes.attribute "aria-label" (toAriaLabel card.kind)
+        ]
+        [ case card.kind of
+            NumberCard { value, color } ->
+                viewNumberCard card.id
+                    { value = value
+                    , color = toHexColor color
+                    }
+
+            ReverseCard { color } ->
+                viewReverseCard card.id
+                    { color = toHexColor color
+                    }
+
+            SkipCard { color } ->
+                viewSkipCard card.id
+                    { color = toHexColor color
+                    }
+
+            DrawTwoCard { color } ->
+                viewDrawTwoCard card.id
+                    { color = toHexColor color
+                    }
+
+            WildCard ->
+                viewWildCard card.id
+
+            WildDraw4Card ->
+                viewWildDraw4Card card.id
+        ]
+
+
+toAriaLabel : CardKind -> String
+toAriaLabel kind =
+    case kind of
         NumberCard { value, color } ->
-            viewNumberCard card.id
-                { value = value
-                , color = toHexColor color
-                }
+            colorToName color ++ " " ++ String.fromInt value
 
         ReverseCard { color } ->
-            viewReverseCard card.id
-                { color = toHexColor color
-                }
+            colorToName color ++ " Reverse"
 
         SkipCard { color } ->
-            viewSkipCard card.id
-                { color = toHexColor color
-                }
+            colorToName color ++ " Skip"
 
         DrawTwoCard { color } ->
-            viewDrawTwoCard card.id
-                { color = toHexColor color
-                }
+            colorToName color ++ " Draw Two"
 
         WildCard ->
-            viewWildCard card.id
+            "Wild"
 
         WildDraw4Card ->
-            viewWildDraw4Card card.id
+            "Wild Draw 4"
 
 
 viewBackOfCard : Card -> Html msg

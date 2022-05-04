@@ -91,7 +91,9 @@ view options =
         [ case List.head cards of
             Just topCard_ ->
                 Html.button
-                    [ Html.Events.onClick options.onClick ]
+                    [ Html.Attributes.attribute "aria-label" "Draw a card"
+                    , Html.Events.onClick options.onClick
+                    ]
                     [ Card.viewBackOfCard topCard_ ]
 
             Nothing ->

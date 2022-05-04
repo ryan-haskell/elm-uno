@@ -1,159 +1,109 @@
 module MainTest exposing (..)
 
-import Card exposing (Card)
-import Deck
-import Dict
 import Expect
-import Hand
+import Fuzz
+import Html.Attributes
 import Main
+import ProgramTest
+import Random
 import Test exposing (Test)
+import Test.Html.Query
+import Test.Html.Selector
+
+
+type alias ProgramTest =
+    ProgramTest.ProgramTest
+        Main.Model
+        Main.Msg
+        (Cmd Main.Msg)
 
 
 suite : Test
 suite =
-    Test.describe "Main.elm"
-        [ Test.test "my tests work" <|
+    Test.describe "Main"
+        [ Test.test "Clicking the deck starts a new game, dealing 7 cards to the player" <|
             \_ ->
-                Expect.equal (1 + 1) 2
-        , Test.describe "Main.checkIfDraw2OrDraw4"
-            [ Test.test "Does not change model when given a blue skip card" <|
-                \_ ->
-                    Main.checkIfDraw2OrDraw4 blueSkipCard initialModel
-                        |> Expect.equal initialModel
-            , Test.describe "When player plays Red Draw 2"
-                [ Test.test "Computer 1's hand gets two cards" <|
-                    \_ ->
-                        let
-                            modelAfterUpdating : Main.Model
-                            modelAfterUpdating =
-                                Main.checkIfDraw2OrDraw4 redDrawTwoCard initialModel
-
-                            initialCardsInHand : Int
-                            initialCardsInHand =
-                                initialModel
-                                    |> getSizeOfComputersHand 1
-
-                            finalCardsInHand : Int
-                            finalCardsInHand =
-                                modelAfterUpdating
-                                    |> getSizeOfComputersHand 1
-                        in
-                        Expect.equal
-                            (initialCardsInHand + 2)
-                            finalCardsInHand
-                , Test.test "The deck loses 2 cards" <|
-                    \_ ->
-                        let
-                            modelAfterUpdating : Main.Model
-                            modelAfterUpdating =
-                                Main.checkIfDraw2OrDraw4 redDrawTwoCard initialModel
-
-                            initialCardsInDeck : Int
-                            initialCardsInDeck =
-                                Deck.size initialModel.deck
-
-                            finalCardsInDeck : Int
-                            finalCardsInDeck =
-                                Deck.size modelAfterUpdating.deck
-                        in
-                        Expect.equal
-                            (initialCardsInDeck - 2)
-                            finalCardsInDeck
-                , Test.test "Computer 2's hand does not change" <|
-                    \_ ->
-                        Main.checkIfDraw2OrDraw4 redDrawTwoCard initialModel
-                            |> getSizeOfComputersHand 2
-                            |> Expect.equal (initialModel |> getSizeOfComputersHand 2)
-                , Test.test "Computer 3's hand does not change" <|
-                    \_ ->
-                        Main.checkIfDraw2OrDraw4 redDrawTwoCard initialModel
-                            |> getSizeOfComputersHand 3
-                            |> Expect.equal (initialModel |> getSizeOfComputersHand 3)
-                ]
-            ]
-        , Test.describe "When computer 3 plays Red Draw 2"
-            [ Test.test "Player's hand gets two cards" <|
-                \_ ->
-                    let
-                        modelAfterUpdating : Main.Model
-                        modelAfterUpdating =
-                            Main.checkIfDraw2OrDraw4 redDrawTwoCard initialModelOnComputer3sTurn
-
-                        initialCardsInHand : Int
-                        initialCardsInHand =
-                            initialModelOnComputer3sTurn
-                                |> getSizeOfPlayersHand
-
-                        finalCardsInHand : Int
-                        finalCardsInHand =
-                            modelAfterUpdating
-                                |> getSizeOfPlayersHand
-                    in
-                    Expect.equal
-                        (initialCardsInHand + 2)
-                        finalCardsInHand
-            , Test.test "The deck loses 2 cards" <|
-                \_ ->
-                    let
-                        modelAfterUpdating : Main.Model
-                        modelAfterUpdating =
-                            Main.checkIfDraw2OrDraw4 redDrawTwoCard initialModelOnComputer3sTurn
-
-                        initialCardsInDeck : Int
-                        initialCardsInDeck =
-                            Deck.size initialModelOnComputer3sTurn.deck
-
-                        finalCardsInDeck : Int
-                        finalCardsInDeck =
-                            Deck.size modelAfterUpdating.deck
-                    in
-                    Expect.equal
-                        (initialCardsInDeck - 2)
-                        finalCardsInDeck
-            , Test.test "Computer 2's hand does not change" <|
-                \_ ->
-                    Main.checkIfDraw2OrDraw4 redDrawTwoCard initialModelOnComputer3sTurn
-                        |> getSizeOfComputersHand 2
-                        |> Expect.equal (initialModelOnComputer3sTurn |> getSizeOfComputersHand 2)
-            , Test.test "Computer 3's hand does not change" <|
-                \_ ->
-                    Main.checkIfDraw2OrDraw4 redDrawTwoCard initialModelOnComputer3sTurn
-                        |> getSizeOfComputersHand 3
-                        |> Expect.equal (initialModelOnComputer3sTurn |> getSizeOfComputersHand 3)
-            ]
+                initializeNewGame { seed = 1 }
+                    |> playerClicksTheDeck
+                    |> expectOurHandHasSevenCards
+        , Test.fuzz positiveInt "Pile never has a wild card on top" <|
+            \randomSeed ->
+                initializeNewGame { seed = randomSeed }
+                    |> playerClicksTheDeck
+                    |> expectPileDoesNotHaveWildCardOnTop
         ]
 
 
-blueSkipCard : Card
-blueSkipCard =
-    Card.blueSkipCard
+positiveInt : Fuzz.Fuzzer Int
+positiveInt =
+    Fuzz.intRange 0 Random.maxInt
 
 
-redDrawTwoCard : Card
-redDrawTwoCard =
-    Card.redDrawTwoCard
+initializeNewGame : { seed : Int } -> ProgramTest
+initializeNewGame { seed } =
+    ProgramTest.createElement
+        { init = Main.init
+        , update = Main.update
+        , view = Main.view
+        }
+        |> ProgramTest.start { seed = seed }
 
 
-getSizeOfComputersHand : Int -> Main.Model -> Int
-getSizeOfComputersHand int model =
-    model.computerHands
-        |> Dict.get int
-        |> Maybe.withDefault Hand.empty
-        |> Hand.size
+playerClicksTheDeck : ProgramTest -> ProgramTest
+playerClicksTheDeck programTest =
+    programTest
+        |> ProgramTest.clickButton "Draw a card"
 
 
-getSizeOfPlayersHand : Main.Model -> Int
-getSizeOfPlayersHand model =
-    model.playersHand
-        |> Hand.size
+expectOurHandHasSevenCards : ProgramTest -> Expect.Expectation
+expectOurHandHasSevenCards programTest =
+    programTest
+        |> ProgramTest.expectView
+            (\query ->
+                query
+                    |> findPlayersHand
+                    |> findHandCardButtons
+                    |> Test.Html.Query.count (Expect.equal 7)
+            )
 
 
-initialModel : Main.Model
-initialModel =
-    Main.init { seed = 1 }
-        |> Tuple.first
+expectPileDoesNotHaveWildCardOnTop : ProgramTest -> Expect.Expectation
+expectPileDoesNotHaveWildCardOnTop programTest =
+    programTest
+        |> ProgramTest.expectView
+            (\query ->
+                query
+                    |> findPile
+                    |> findTopCardInPile
+                    |> Test.Html.Query.hasNot [ selectAriaLabel "Wild" ]
+            )
 
 
-initialModelOnComputer3sTurn : Main.Model
-initialModelOnComputer3sTurn =
-    { initialModel | currentPlayerId = 3 }
+selectAriaLabel : String -> Test.Html.Selector.Selector
+selectAriaLabel value =
+    Test.Html.Selector.attribute (Html.Attributes.attribute "aria-label" value)
+
+
+findPile : Test.Html.Query.Single msg -> Test.Html.Query.Single msg
+findPile query =
+    query
+        |> Test.Html.Query.find [ Test.Html.Selector.class "pile" ]
+
+
+findTopCardInPile : Test.Html.Query.Single msg -> Test.Html.Query.Single msg
+findTopCardInPile query =
+    query
+        |> Test.Html.Query.findAll [ Test.Html.Selector.class "card__wrapper" ]
+        |> Test.Html.Query.index 0
+
+
+findPlayersHand : Test.Html.Query.Single msg -> Test.Html.Query.Single msg
+findPlayersHand query =
+    query
+        |> Test.Html.Query.find [ Test.Html.Selector.class "player-hand" ]
+
+
+findHandCardButtons : Test.Html.Query.Single msg -> Test.Html.Query.Multiple msg
+findHandCardButtons query =
+    query
+        |> Test.Html.Query.findAll [ Test.Html.Selector.class "hand__card-button" ]

@@ -163,7 +163,14 @@ button {
   transform: none;
 }
 
-.hand--bottom {}
+.hand--bottom {
+  transform: translate(-50%, 50vh);
+  left: 50%;
+}
+
+.hand--has-cards.hand--bottom {
+  transform: translate(-50%);
+}
 
 .hand--left {
   pointer-events: none;

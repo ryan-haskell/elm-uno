@@ -1,8 +1,7 @@
-module Main exposing (Model, init, main)
+module Main exposing (Model, Msg, init, main, subscriptions, update, view)
 
 import Browser
 import Browser.Dom
-import Browser.Events
 import Card exposing (Card)
 import Deck exposing (Deck)
 import Dict exposing (Dict)
@@ -29,7 +28,7 @@ main : Program Flags Model Msg
 main =
     Browser.element
         { init = init
-        , update = detectTurnOrderChange update
+        , update = update
         , view = view
         , subscriptions = subscriptions
         }
@@ -203,7 +202,12 @@ type alias BoundingRect =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update =
+    detectTurnOrderChange update_
+
+
+update_ : Msg -> Model -> ( Model, Cmd Msg )
+update_ msg model =
     case msg of
         PlayerClickedDeck ->
             case model.phase of
@@ -1371,14 +1375,16 @@ toMaybeFloatingCard floatingCardState =
 
 viewPlayerHand : Model -> Html Msg
 viewPlayerHand model =
-    Hand.view
-        { cardToHide = toMaybeFloatingCard model.floatingCardState
-        , side = Hand.Bottom
-        , hand = model.playersHand
-        , isCurrentlyPlaying = 0 == model.currentPlayerId
-        , shouldHideCards = False
-        , onClick = PlayerClickedCardInHand
-        }
+    Html.div [ Html.Attributes.class "player-hand" ]
+        [ Hand.view
+            { cardToHide = toMaybeFloatingCard model.floatingCardState
+            , side = Hand.Bottom
+            , hand = model.playersHand
+            , isCurrentlyPlaying = 0 == model.currentPlayerId
+            , shouldHideCards = False
+            , onClick = PlayerClickedCardInHand
+            }
+        ]
 
 
 viewDialog : Model -> Html Msg
