@@ -5,9 +5,11 @@ module Card exposing
     , isReverse, isSkip, isDrawTwo, isWildDraw4
     , isOneOfTheWildCards
     , view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
+    , toAriaLabel
     , Id, toUniqueId
     , Color(..), colorToName, getColorsForCards
     , CardKind(..), fromKinds
+    , fake
     )
 
 {-|
@@ -20,6 +22,7 @@ module Card exposing
 @docs isOneOfTheWildCards
 
 @docs view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
+@docs toAriaLabel
 
 @docs Id, toUniqueId
 
@@ -215,7 +218,7 @@ view : Card -> Html msg
 view (Card card) =
     Html.div
         [ Html.Attributes.class "card__wrapper"
-        , Html.Attributes.attribute "aria-label" (toAriaLabel card.kind)
+        , Html.Attributes.attribute "aria-label" (toAriaLabel (Card card))
         ]
         [ case card.kind of
             NumberCard { value, color } ->
@@ -247,9 +250,9 @@ view (Card card) =
         ]
 
 
-toAriaLabel : CardKind -> String
-toAriaLabel kind =
-    case kind of
+toAriaLabel : Card -> String
+toAriaLabel (Card card) =
+    case card.kind of
         NumberCard { value, color } ->
             colorToName color ++ " " ++ String.fromInt value
 
@@ -979,3 +982,8 @@ white =
 black : String
 black =
     "#000000"
+
+
+fake : Card
+fake =
+    Card { id = "0", kind = WildCard }

@@ -1,4 +1,4 @@
-module Main exposing (Model, Msg, init, initWithSettings, main, subscriptions, update, view)
+module Main exposing (Model, Msg(..), init, initWithSettings, main, subscriptions, update, view)
 
 import Browser
 import Browser.Dom
@@ -27,7 +27,19 @@ type alias Flags =
 main : Program Flags Model Msg
 main =
     Browser.element
-        { init = init
+        { init =
+            initWithSettings
+                { deck =
+                    Deck.fromKinds
+                        [ Card.NumberCard { value = 1, color = Card.Blue }
+                        , Card.NumberCard { value = 1, color = Card.Blue }
+                        , Card.NumberCard { value = 1, color = Card.Blue }
+                        , Card.NumberCard { value = 1, color = Card.Blue }
+                        , Card.NumberCard { value = 1, color = Card.Blue }
+                        ]
+                , cardsToDraw = 1
+                , shouldShuffleDeck = False
+                }
         , update = update
         , view = view
         , subscriptions = subscriptions
@@ -39,7 +51,8 @@ main =
 
 
 type alias Model =
-    { cardsToDraw : Int
+    { shouldShuffleDeck : Bool
+    , cardsToDraw : Int
     , phase : Phase
     , deck : Deck
     , pile : Pile
@@ -103,9 +116,16 @@ type Phase
     | PlayerWonTheGame Int
 
 
-initWithSettings : { deck : Deck, cardsToDraw : Int } -> Flags -> ( Model, Cmd Msg )
+initWithSettings :
+    { deck : Deck
+    , cardsToDraw : Int
+    , shouldShuffleDeck : Bool
+    }
+    -> Flags
+    -> ( Model, Cmd Msg )
 initWithSettings options flags =
-    ( { cardsToDraw = options.cardsToDraw
+    ( { shouldShuffleDeck = options.shouldShuffleDeck
+      , cardsToDraw = options.cardsToDraw
       , phase = ReadyToPlay
       , deck = options.deck
       , pile = Pile.empty
@@ -136,6 +156,7 @@ init flags =
     initWithSettings
         { cardsToDraw = 7
         , deck = Deck.new (Random.initialSeed 0)
+        , shouldShuffleDeck = True
         }
         flags
 
@@ -736,7 +757,11 @@ startNewGame model =
 
         newDeck : Deck
         newDeck =
-            Deck.new (Random.initialSeed model.seed)
+            if model.shouldShuffleDeck then
+                Deck.new (Random.initialSeed model.seed)
+
+            else
+                model.deck
 
         afterDrawPlayerHand : { cards : List Card, deck : Deck }
         afterDrawPlayerHand =

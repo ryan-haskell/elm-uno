@@ -45,7 +45,9 @@ suite =
                         ]
                     , cardsToDraw = 1
                     }
-                    |> playerPlaysCard "Blue 1"
+                    |> playerClicksTheDeck
+                    |> playerPlaysCard "Play Blue 1"
+                    |> skipPlayCardOntoPileAnimation
                     |> expectToSeeYouWonMessage
         ]
 
@@ -72,6 +74,7 @@ initializeGameWith { deck, cardsToDraw } =
             Main.initWithSettings
                 { deck = Deck.fromKinds deck
                 , cardsToDraw = cardsToDraw
+                , shouldShuffleDeck = False
                 }
         , update = Main.update
         , view = Main.view
@@ -91,6 +94,12 @@ playerPlaysCard cardLabel programTest =
         |> ProgramTest.within
             findPlayersHand
             (ProgramTest.clickButton cardLabel)
+
+
+skipPlayCardOntoPileAnimation : ProgramTest -> ProgramTest
+skipPlayCardOntoPileAnimation programTest =
+    programTest
+        |> ProgramTest.update (Main.AnimationPlayerHandToPileComplete Card.fake)
 
 
 expectToSeeYouWonMessage : ProgramTest -> Expect.Expectation

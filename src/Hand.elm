@@ -111,7 +111,8 @@ view options =
                             False
             in
             Html.button
-                [ Html.Attributes.class "hand__card-button"
+                [ Html.Attributes.attribute "aria-label" ("Play " ++ Card.toAriaLabel card)
+                , Html.Attributes.class "hand__card-button"
                 , Html.Events.onClick (options.onClick card)
                 , if shouldHideCard then
                     Html.Attributes.style "opacity" "0"
