@@ -9,12 +9,13 @@
     "build": "vite build",
     "test": "elm-test",
     "test:watch": "elm-test --watch",
-    "deploy": "npm run build && npm run test"
+    "deploy": "npm run test && npm run build"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "elm": "0.19.1-5",
+    "elm-test": "0.19.1-revision7",
     "vite": "2.9.5",
     "vite-plugin-elm": "2.6.1"
   }
