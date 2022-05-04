@@ -18,8 +18,10 @@ npm start
 If you want to deploy a custom version of this to Netlify, use this build command, and point to the `dist` directory:
 
 ```
-npm run build
+npm run deploy
 ```
+
+( The `deploy` command will run the test suite before building the Elm app! )
 
 ## running the test suite
 
