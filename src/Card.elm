@@ -7,7 +7,7 @@ module Card exposing
     , view, viewBackOfCard, viewEmptyDeck, viewEmptyPile
     , Id, toUniqueId
     , Color(..), colorToName, getColorsForCards
-    , blueSkipCard, redDrawTwoCard
+    , CardKind(..), fromKinds
     )
 
 {-|
@@ -25,10 +25,7 @@ module Card exposing
 
 @docs Color, colorToName, getColorsForCards
 
-
-### testing
-
-@docs blueSkipCard, redDrawTwoCard
+@docs CardKind, fromKinds
 
 -}
 
@@ -440,6 +437,11 @@ unshuffledDeck =
                 , List.repeat 4 WildDraw4Card
                 ]
     in
+    fromKinds cardKinds
+
+
+fromKinds : List CardKind -> List Card
+fromKinds cardKinds =
     cardKinds
         |> List.indexedMap
             (\index kind ->
@@ -977,23 +979,3 @@ white =
 black : String
 black =
     "#000000"
-
-
-
--- FOR TESTING
-
-
-blueSkipCard : Card
-blueSkipCard =
-    Card
-        { id = "blueSkipCard"
-        , kind = SkipCard { color = Blue }
-        }
-
-
-redDrawTwoCard : Card
-redDrawTwoCard =
-    Card
-        { id = "redDrawTwoCard"
-        , kind = DrawTwoCard { color = Red }
-        }

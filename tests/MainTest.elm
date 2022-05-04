@@ -1,5 +1,7 @@
 module MainTest exposing (..)
 
+import Card
+import Deck
 import Expect
 import Fuzz
 import Html.Attributes
@@ -31,6 +33,20 @@ suite =
                 initializeNewGame { seed = randomSeed }
                     |> playerClicksTheDeck
                     |> expectPileDoesNotHaveWildCardOnTop
+        , Test.test "When a player plays their last card, they win the game" <|
+            \_ ->
+                initializeGameWith
+                    { deck =
+                        [ Card.NumberCard { value = 1, color = Card.Blue }
+                        , Card.NumberCard { value = 1, color = Card.Blue }
+                        , Card.NumberCard { value = 1, color = Card.Blue }
+                        , Card.NumberCard { value = 1, color = Card.Blue }
+                        , Card.NumberCard { value = 1, color = Card.Blue }
+                        ]
+                    , cardsToDraw = 1
+                    }
+                    |> playerPlaysCard "Blue 1"
+                    |> expectToSeeYouWonMessage
         ]
 
 
@@ -49,10 +65,40 @@ initializeNewGame { seed } =
         |> ProgramTest.start { seed = seed }
 
 
+initializeGameWith : { deck : List Card.CardKind, cardsToDraw : Int } -> ProgramTest
+initializeGameWith { deck, cardsToDraw } =
+    ProgramTest.createElement
+        { init =
+            Main.initWithSettings
+                { deck = Deck.fromKinds deck
+                , cardsToDraw = cardsToDraw
+                }
+        , update = Main.update
+        , view = Main.view
+        }
+        |> ProgramTest.start { seed = 1 }
+
+
 playerClicksTheDeck : ProgramTest -> ProgramTest
 playerClicksTheDeck programTest =
     programTest
         |> ProgramTest.clickButton "Draw a card"
+
+
+playerPlaysCard : String -> ProgramTest -> ProgramTest
+playerPlaysCard cardLabel programTest =
+    programTest
+        |> ProgramTest.within
+            findPlayersHand
+            (ProgramTest.clickButton cardLabel)
+
+
+expectToSeeYouWonMessage : ProgramTest -> Expect.Expectation
+expectToSeeYouWonMessage programTest =
+    programTest
+        |> ProgramTest.expectViewHas
+            [ Test.Html.Selector.text "You won!"
+            ]
 
 
 expectOurHandHasSevenCards : ProgramTest -> Expect.Expectation

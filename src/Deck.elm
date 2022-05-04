@@ -5,6 +5,7 @@ module Deck exposing
     , topCard, topCards
     , reshuffle
     , view
+    , fromKinds
     )
 
 {-|
@@ -15,6 +16,8 @@ module Deck exposing
 @docs topCard, topCards
 @docs reshuffle
 @docs view
+
+@docs fromKinds
 
 -}
 
@@ -99,3 +102,10 @@ view options =
             Nothing ->
                 Card.viewEmptyDeck
         ]
+
+
+fromKinds : List Card.CardKind -> Deck
+fromKinds kinds =
+    Deck
+        { cards = Card.fromKinds kinds
+        }

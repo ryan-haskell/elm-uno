@@ -1,4 +1,4 @@
-module Main exposing (Model, Msg, init, main, subscriptions, update, view)
+module Main exposing (Model, Msg, init, initWithSettings, main, subscriptions, update, view)
 
 import Browser
 import Browser.Dom
@@ -39,7 +39,8 @@ main =
 
 
 type alias Model =
-    { phase : Phase
+    { cardsToDraw : Int
+    , phase : Phase
     , deck : Deck
     , pile : Pile
     , direction : Direction
@@ -102,10 +103,11 @@ type Phase
     | PlayerWonTheGame Int
 
 
-init : Flags -> ( Model, Cmd Msg )
-init flags =
-    ( { phase = ReadyToPlay
-      , deck = Deck.new (Random.initialSeed 0)
+initWithSettings : { deck : Deck, cardsToDraw : Int } -> Flags -> ( Model, Cmd Msg )
+initWithSettings options flags =
+    ( { cardsToDraw = options.cardsToDraw
+      , phase = ReadyToPlay
+      , deck = options.deck
       , pile = Pile.empty
       , currentPlayerId = 0
       , direction = Clockwise
@@ -127,6 +129,15 @@ init flags =
       }
     , Cmd.none
     )
+
+
+init : Flags -> ( Model, Cmd Msg )
+init flags =
+    initWithSettings
+        { cardsToDraw = 7
+        , deck = Deck.new (Random.initialSeed 0)
+        }
+        flags
 
 
 
@@ -720,13 +731,16 @@ subscriptions model =
 startNewGame : Model -> Model
 startNewGame model =
     let
+        { cardsToDraw } =
+            model
+
         newDeck : Deck
         newDeck =
             Deck.new (Random.initialSeed model.seed)
 
         afterDrawPlayerHand : { cards : List Card, deck : Deck }
         afterDrawPlayerHand =
-            Deck.draw 7 newDeck
+            Deck.draw cardsToDraw newDeck
 
         afterDrawingToComputers :
             { deck : Deck
@@ -753,7 +767,7 @@ startNewGame model =
         loop playerId _ { deck, computerHands } =
             let
                 afterDrawing =
-                    Deck.draw 7 deck
+                    Deck.draw cardsToDraw deck
             in
             { computerHands =
                 Dict.insert playerId
