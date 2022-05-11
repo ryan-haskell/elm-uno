@@ -27,19 +27,7 @@ type alias Flags =
 main : Program Flags Model Msg
 main =
     Browser.element
-        { init =
-            initWithSettings
-                { deck =
-                    Deck.fromKinds
-                        [ Card.NumberCard { value = 1, color = Card.Blue }
-                        , Card.NumberCard { value = 1, color = Card.Blue }
-                        , Card.NumberCard { value = 1, color = Card.Blue }
-                        , Card.NumberCard { value = 1, color = Card.Blue }
-                        , Card.NumberCard { value = 1, color = Card.Blue }
-                        ]
-                , cardsToDraw = 1
-                , shouldShuffleDeck = False
-                }
+        { init = init
         , update = update
         , view = view
         , subscriptions = subscriptions
