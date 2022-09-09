@@ -186,7 +186,8 @@ type Msg
 
 
 type alias DrawAnimationPayload =
-    { model : Model
+    { target : PlayerId
+    , model : Model
     , drawAction : DrawCardAction
     }
 
@@ -441,12 +442,22 @@ update_ msg model =
                         |> checkIfDeckIsEmpty
                         |> removeFloatingCard
                         |> checkForAlert card
+
+                nextPlayerId : PlayerId
+                nextPlayerId =
+                    getNextPlayerId
+                        { distance = 1
+                        , direction = model.direction
+                        , total = getTotalPlayers model
+                        , currentPlayerId = model.currentPlayerId
+                        }
             in
             case toMaybeDrawAction card of
                 Just drawAction ->
                     ( model
                     , startDrawAnimation
-                        { model = updatedModel
+                        { target = nextPlayerId
+                        , model = updatedModel
                         , drawAction = drawAction
                         }
                     )
@@ -458,12 +469,7 @@ update_ msg model =
             let
                 nextPlayerId : PlayerId
                 nextPlayerId =
-                    getNextPlayerId
-                        { distance = 1
-                        , direction = model.direction
-                        , total = getTotalPlayers model
-                        , currentPlayerId = model.currentPlayerId
-                        }
+                    payload.target
 
                 nextPlayersHand : Hand
                 nextPlayersHand =
@@ -524,7 +530,7 @@ update_ msg model =
 
         DrawAnimationComplete payload ->
             ( payload.model
-                |> performDrawCardAction payload.drawAction
+                |> performDrawCardAction payload
                 |> removeFloatingCard
             , Cmd.none
             )
@@ -1027,12 +1033,22 @@ performComputerAction computerAction model =
                         |> checkIfDeckIsEmpty
                         |> removeFloatingCard
                         |> checkForAlert card
+
+                nextPlayerId : PlayerId
+                nextPlayerId =
+                    getNextPlayerId
+                        { distance = 1
+                        , direction = model.direction
+                        , total = getTotalPlayers model
+                        , currentPlayerId = model.currentPlayerId
+                        }
             in
             case toMaybeDrawAction card of
                 Just drawAction ->
                     ( model
                     , startDrawAnimation
-                        { model = updatedModel
+                        { target = nextPlayerId
+                        , model = updatedModel
                         , drawAction = drawAction
                         }
                     )
@@ -1125,18 +1141,9 @@ type DrawCardAction
     | DrawFourPlayed
 
 
-performDrawCardAction : DrawCardAction -> Model -> Model
-performDrawCardAction action model =
+performDrawCardAction : DrawAnimationPayload -> Model -> Model
+performDrawCardAction payload model =
     let
-        skippedPlayerId : PlayerId
-        skippedPlayerId =
-            getNextPlayerId
-                { total = getTotalPlayers model
-                , distance = 1
-                , direction = reverseDirection model.direction
-                , currentPlayerId = model.currentPlayerId
-                }
-
         giveCards : Int -> Model
         giveCards amount =
             let
@@ -1144,7 +1151,7 @@ performDrawCardAction action model =
                 afterDrawing =
                     Deck.draw amount model.deck
             in
-            case skippedPlayerId of
+            case payload.target of
                 0 ->
                     { model
                         | playersHand =
@@ -1162,7 +1169,7 @@ performDrawCardAction action model =
                         , deck = afterDrawing.deck
                     }
     in
-    case action of
+    case payload.drawAction of
         DrawTwoPlayed ->
             giveCards 2
 
